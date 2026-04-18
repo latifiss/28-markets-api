@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import { connectDB } from './db/index';
 import authRouter from './routes/auth';
 import usageRouter from './routes/usage';
@@ -17,8 +17,6 @@ import treasuryRoutes from './routes/treasury.routes';
 import stockRoutes from './routes/stocks.routes';
 import eventRoutes from './routes/event.routes';
 import billingRouter from './routes/billing';
-
-dotenv.config();
 
 connectDB();
 

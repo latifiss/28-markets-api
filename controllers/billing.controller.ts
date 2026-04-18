@@ -6,7 +6,11 @@ import {
   createCheckoutSession,
   updateUserAfterSuccessfulPayment,
   verifyPaystackWebhook,
+  verifyPaystackReference,
 } from '../service/billing';
+
+const PAYSTACK_SUCCESS_URL = process.env.PAYSTACK_SUCCESS_URL || 'http://localhost:3000/success';
+const PAYSTACK_CANCEL_URL = process.env.PAYSTACK_CANCEL_URL || 'http://localhost:3000/cancel';
 
 const getRedirectUrl = (url: string | undefined, fallback: string) => url || fallback;
 
@@ -93,5 +97,21 @@ export const paystackWebhookHandler = async (req: Request, res: Response): Promi
   } catch (error: any) {
     console.error('paystackWebhookHandler error:', error);
     res.status(400).send(`Webhook Error: ${error.message}`);
+  }
+};
+
+export const paystackCallbackHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const reference = String(req.query.reference || req.query.reference_code || '');
+    if (!reference) {
+      res.status(400).send('Missing Paystack reference');
+      return;
+    }
+
+    const transaction = await verifyPaystackReference(reference);
+    res.redirect(`${PAYSTACK_SUCCESS_URL}?reference=${encodeURIComponent(reference)}`);
+  } catch (error: any) {
+    console.error('paystackCallbackHandler error:', error);
+    res.redirect(`${PAYSTACK_CANCEL_URL}?error=${encodeURIComponent(error.message || 'payment_failed')}`);
   }
 };

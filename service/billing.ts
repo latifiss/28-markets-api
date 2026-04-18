@@ -1,8 +1,9 @@
 import type { PlanTier } from '../utils/tiers';
 import type { IUser } from '../models/user';
 import User from '../models/user';
-import { initializeTransaction, verifyWebhookSignature } from '../utils/paystack';
+import { initializeTransaction, verifyWebhookSignature, verifyTransaction } from '../utils/paystack';
 
+const PAYSTACK_CALLBACK_URL = process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:6060/api/billing/paystack/callback';
 const PAYSTACK_SUCCESS_URL = process.env.PAYSTACK_SUCCESS_URL || 'http://localhost:3000/success';
 const PAYSTACK_CANCEL_URL = process.env.PAYSTACK_CANCEL_URL || 'http://localhost:3000/cancel';
 const PAYSTACK_DEFAULT_CURRENCY = process.env.PAYSTACK_DEFAULT_CURRENCY || 'NGN';
@@ -27,12 +28,21 @@ export const createCheckoutSession = async (user: IUser, tier: Exclude<PlanTier,
     throw new Error('Paystack amount not configured for selected tier.');
   }
 
-  return initializeTransaction(user.email, amount, PAYSTACK_SUCCESS_URL, {
+  return initializeTransaction(user.email, amount, PAYSTACK_CALLBACK_URL, {
     userId: user._id.toString(),
     tier,
     cancelUrl: PAYSTACK_CANCEL_URL,
     currency: PAYSTACK_DEFAULT_CURRENCY,
   });
+};
+
+export const verifyPaystackReference = async (reference: string) => {
+  const transaction = await verifyTransaction(reference);
+  if (transaction.status !== 'success') {
+    throw new Error(`Paystack transaction ${reference} is not successful`);
+  }
+  await updateUserAfterSuccessfulPayment({ data: transaction });
+  return transaction;
 };
 
 export const createBillingPortalSession = async (): Promise<never> => {

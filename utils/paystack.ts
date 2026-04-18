@@ -1,12 +1,16 @@
 import https from 'https';
 import crypto from 'crypto';
 
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-if (!PAYSTACK_SECRET_KEY) {
-  throw new Error('Missing PAYSTACK_SECRET_KEY environment variable');
-}
+const getPaystackSecretKey = (): string => {
+  const key = process.env.PAYSTACK_SECRET_KEY;
+  if (!key) {
+    throw new Error('Missing PAYSTACK_SECRET_KEY environment variable');
+  }
+  return key;
+};
 
 const paystackRequest = async (path: string, method = 'GET', body?: any): Promise<any> => {
+  const PAYSTACK_SECRET_KEY = getPaystackSecretKey();
   const payload = body ? JSON.stringify(body) : undefined;
   const options: https.RequestOptions = {
     hostname: 'api.paystack.co',
@@ -66,7 +70,16 @@ export const initializeTransaction = async (
   return response.data;
 };
 
+export const verifyTransaction = async (reference: string) => {
+  const response = await paystackRequest(`/transaction/verify/${encodeURIComponent(reference)}`);
+  if (!response.status) {
+    throw new Error(response.message || 'Paystack transaction verification failed');
+  }
+  return response.data;
+};
+
 export const verifyWebhookSignature = (rawBody: Buffer, signature: string): boolean => {
+  const PAYSTACK_SECRET_KEY = getPaystackSecretKey();
   const hmac = crypto.createHmac('sha512', PAYSTACK_SECRET_KEY);
   hmac.update(rawBody);
   const digest = hmac.digest('hex');
