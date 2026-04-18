@@ -8,6 +8,9 @@ export interface IUser extends Document {
   name: string;
   isActive: boolean;
   tier: PlanTier;
+  stripeCustomerId?: string;
+  subscriptionStatus?: 'active' | 'past_due' | 'canceled' | 'incomplete';
+  currentPeriodEnd?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +39,21 @@ const userSchema: Schema = new Schema(
       type: String,
       enum: ['free', 'pro', 'business'],
       default: 'free',
+    },
+    stripeCustomerId: {
+      type: String,
+      required: false,
+      unique: false,
+      sparse: true,
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: ['active', 'past_due', 'canceled', 'incomplete'],
+      default: 'active',
+    },
+    currentPeriodEnd: {
+      type: Date,
+      required: false,
     },
   },
   {

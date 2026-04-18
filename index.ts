@@ -16,6 +16,7 @@ import economicRoutes from './routes/economic.routes';
 import treasuryRoutes from './routes/treasury.routes';
 import stockRoutes from './routes/stocks.routes';
 import eventRoutes from './routes/event.routes';
+import billingRouter from './routes/billing';
 
 dotenv.config();
 
@@ -23,7 +24,7 @@ connectDB();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 
 const allowedOrigins = [
   'http://localhost:4000',
@@ -61,6 +62,7 @@ app.use('/api/economy', economicRoutes);
 app.use('/api/treasury', treasuryRoutes);
 app.use('/api/stocks', stockRoutes);
 app.use('/api/event', eventRoutes);
+app.use('/api/billing', billingRouter);
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
