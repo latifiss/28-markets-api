@@ -100,6 +100,16 @@ const invalidateCompanyCache = async (
   }
 };
 
+interface BulkCreateResult {
+  successful: Array<{ company_id: string; operation: string; id?: string }>;
+  failed: Array<{ company_id?: string; operation: string; error: string; data?: any }>;
+}
+
+interface BulkUpdateResult {
+  successful: Array<{ company_id: string; operation: string }>;
+  failed: Array<{ company_id?: string; operation: string; error: string }>;
+}
+
 export const createProfile = async (
   req: Request,
   res: Response,
@@ -482,13 +492,9 @@ export const updateStatistics = async (
   try {
     const { company_id } = req.params;
 
-    const statistics = await Statistics.findOneAndUpdate(
-      { company_id },
-      req.body,
-      { new: true, runValidators: true },
-    );
-
-    if (!statistics) {
+    const existingStats = await Statistics.findOne({ company_id });
+    
+    if (!existingStats) {
       res.status(404).json({
         success: false,
         code: 404,
@@ -497,6 +503,18 @@ export const updateStatistics = async (
       });
       return;
     }
+
+    const updateData = req.body;
+    
+    if (updateData.key_statistics && !updateData.key_statistics.current_price) {
+      updateData.key_statistics.current_price = existingStats.key_statistics?.current_price;
+    }
+
+    const statistics = await Statistics.findOneAndUpdate(
+      { company_id },
+      updateData,
+      { new: true, runValidators: true },
+    );
 
     await invalidateCompanyCache(company_id as string, statistics.ticker_symbol);
 
@@ -2675,18 +2693,17 @@ export const updateLatestPrice = async (
       return;
     }
 
-    if ((priceHistory as any).history.length === 0) {
-      res.status(404).json({
-        success: false,
-        code: 404,
-        message: 'No price entries found',
-        details: { company_id },
-      });
-      return;
-    }
+    const newEntry = {
+      date: new Date(),
+      price: String(price),
+    };
 
-    (priceHistory as any).history[0].price = String(price);
-    (priceHistory as any).history[0].date = new Date();
+    (priceHistory as any).history.push(newEntry);
+
+    const MAX_HISTORY_ENTRIES = 5000;
+    if ((priceHistory as any).history.length > MAX_HISTORY_ENTRIES) {
+      (priceHistory as any).history = (priceHistory as any).history.slice(-MAX_HISTORY_ENTRIES);
+    }
 
     await priceHistory.save();
     await invalidateCompanyCache(company_id as string, priceHistory.ticker_symbol);
@@ -2698,10 +2715,7 @@ export const updateLatestPrice = async (
       data: {
         company_id: priceHistory.company_id,
         company_name: priceHistory.company_name,
-        latestPrice: {
-          date: (priceHistory as any).history[0].date,
-          price: (priceHistory as any).history[0].price,
-        },
+        latestPrice: newEntry,
         totalEntries: (priceHistory as any).history.length,
       },
     });
@@ -3373,6 +3387,920 @@ export const getMarketMoversByExchange = async (
       success: false,
       code: 500,
       message: 'Internal server error fetching market movers',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkCreateProfiles = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { companies } = req.body;
+    
+    if (!companies || !Array.isArray(companies) || companies.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Companies array is required and must not be empty',
+        details: { required: ['companies'] },
+      });
+      return;
+    }
+
+    const result: BulkCreateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const company of companies) {
+      try {
+        const { company_id } = company;
+        
+        if (!company_id) {
+          result.failed.push({
+            operation: 'create_profile',
+            error: 'Company ID is required',
+            data: company,
+          });
+          continue;
+        }
+
+        const existingProfile = await Profile.findOne({ company_id });
+        if (existingProfile) {
+          result.failed.push({
+            company_id,
+            operation: 'create_profile',
+            error: 'Profile already exists for this company',
+            data: company,
+          });
+          continue;
+        }
+
+        const profile = await Profile.create(company);
+        await invalidateCompanyCache(company_id, company.about?.ticker_symbol);
+        
+        result.successful.push({
+          company_id,
+          operation: 'create_profile',
+          id: profile._id.toString(),
+        });
+      } catch (error: any) {
+        result.failed.push({
+          company_id: company.company_id,
+          operation: 'create_profile',
+          error: error.message,
+          data: company,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      code: 201,
+      message: `Bulk profile creation completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk create profiles error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk profile creation',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkCreateStatistics = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { statistics } = req.body;
+    
+    if (!statistics || !Array.isArray(statistics) || statistics.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Statistics array is required and must not be empty',
+        details: { required: ['statistics'] },
+      });
+      return;
+    }
+
+    const result: BulkCreateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const stat of statistics) {
+      try {
+        const { company_id } = stat;
+        
+        if (!company_id) {
+          result.failed.push({
+            operation: 'create_statistics',
+            error: 'Company ID is required',
+            data: stat,
+          });
+          continue;
+        }
+
+        const existingStats = await Statistics.findOne({ company_id });
+        if (existingStats) {
+          result.failed.push({
+            company_id,
+            operation: 'create_statistics',
+            error: 'Statistics already exists for this company',
+            data: stat,
+          });
+          continue;
+        }
+
+        const statisticsDoc = await Statistics.create(stat);
+        
+        if ((statisticsDoc as any).addToKeyStatsHistory) {
+          (statisticsDoc as any).addToKeyStatsHistory();
+          await statisticsDoc.save();
+        }
+
+        await invalidateCompanyCache(company_id, stat.ticker_symbol);
+        
+        result.successful.push({
+          company_id,
+          operation: 'create_statistics',
+          id: statisticsDoc._id.toString(),
+        });
+      } catch (error: any) {
+        result.failed.push({
+          company_id: stat.company_id,
+          operation: 'create_statistics',
+          error: error.message,
+          data: stat,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      code: 201,
+      message: `Bulk statistics creation completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk create statistics error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk statistics creation',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkCreatePriceHistory = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { priceHistories } = req.body;
+    
+    if (!priceHistories || !Array.isArray(priceHistories) || priceHistories.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Price histories array is required and must not be empty',
+        details: { required: ['priceHistories'] },
+      });
+      return;
+    }
+
+    const result: BulkCreateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const history of priceHistories) {
+      try {
+        const { company_id } = history;
+        
+        if (!company_id) {
+          result.failed.push({
+            operation: 'create_price_history',
+            error: 'Company ID is required',
+            data: history,
+          });
+          continue;
+        }
+
+        const existingHistory = await PriceHistory.findOne({ company_id });
+        if (existingHistory) {
+          result.failed.push({
+            company_id,
+            operation: 'create_price_history',
+            error: 'Price history already exists for this company',
+            data: history,
+          });
+          continue;
+        }
+
+        const priceHistory = await PriceHistory.create(history);
+        await invalidateCompanyCache(company_id, history.ticker_symbol);
+        
+        result.successful.push({
+          company_id,
+          operation: 'create_price_history',
+          id: priceHistory._id.toString(),
+        });
+      } catch (error: any) {
+        result.failed.push({
+          company_id: history.company_id,
+          operation: 'create_price_history',
+          error: error.message,
+          data: history,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      code: 201,
+      message: `Bulk price history creation completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk create price history error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk price history creation',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkAddPriceEntries = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { entries } = req.body;
+    
+    if (!entries || !Array.isArray(entries) || entries.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Entries array is required and must not be empty',
+        details: { 
+          required: ['entries'],
+          entryFormat: { company_id: 'string', date: 'Date', price: 'string' }
+        },
+      });
+      return;
+    }
+
+    const result: BulkUpdateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const entry of entries) {
+      try {
+        const { company_id, date, price } = entry;
+        
+        if (!company_id || !date || !price) {
+          result.failed.push({
+            company_id,
+            operation: 'add_price_entry',
+            error: 'Company ID, date, and price are required',
+          });
+          continue;
+        }
+
+        const priceHistory = await PriceHistory.findOne({ company_id });
+        if (!priceHistory) {
+          result.failed.push({
+            company_id,
+            operation: 'add_price_entry',
+            error: 'Price history not found for this company',
+          });
+          continue;
+        }
+
+        (priceHistory as any).history.push({
+          date: new Date(date),
+          price: String(price),
+        });
+
+        (priceHistory as any).history.sort(
+          (a: any, b: any) => b.date - a.date,
+        );
+
+        const MAX_HISTORY_ENTRIES = 5000;
+        if ((priceHistory as any).history.length > MAX_HISTORY_ENTRIES) {
+          (priceHistory as any).history = (priceHistory as any).history.slice(0, MAX_HISTORY_ENTRIES);
+        }
+
+        await priceHistory.save();
+        await invalidateCompanyCache(company_id, priceHistory.ticker_symbol);
+        
+        result.successful.push({
+          company_id,
+          operation: 'add_price_entry',
+        });
+      } catch (error: any) {
+        result.failed.push({
+          company_id: entry.company_id,
+          operation: 'add_price_entry',
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk price entries added: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk add price entries error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk price entry addition',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkUpdateStatistics = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { updates } = req.body;
+    
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Updates array is required and must not be empty',
+        details: { required: ['updates'] },
+      });
+      return;
+    }
+
+    const result: BulkUpdateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const update of updates) {
+      try {
+        const { company_id, data } = update;
+        
+        if (!company_id || !data) {
+          result.failed.push({
+            company_id,
+            operation: 'update_statistics',
+            error: 'Company ID and update data are required',
+          });
+          continue;
+        }
+
+        const statistics = await Statistics.findOneAndUpdate(
+          { company_id },
+          data,
+          { new: true, runValidators: true },
+        );
+
+        if (!statistics) {
+          result.failed.push({
+            company_id,
+            operation: 'update_statistics',
+            error: 'Statistics not found for this company',
+          });
+          continue;
+        }
+
+        await invalidateCompanyCache(company_id, statistics.ticker_symbol);
+        
+        result.successful.push({
+          company_id,
+          operation: 'update_statistics',
+        });
+      } catch (error: any) {
+        result.failed.push({
+          company_id: update.company_id,
+          operation: 'update_statistics',
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk statistics update completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk update statistics error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk statistics update',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkUpdateProfiles = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { updates } = req.body;
+    
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Updates array is required and must not be empty',
+        details: { required: ['updates'] },
+      });
+      return;
+    }
+
+    const result: BulkUpdateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const update of updates) {
+      try {
+        const { company_id, data } = update;
+        
+        if (!company_id || !data) {
+          result.failed.push({
+            company_id,
+            operation: 'update_profile',
+            error: 'Company ID and update data are required',
+          });
+          continue;
+        }
+
+        const profile = await Profile.findOneAndUpdate(
+          { company_id },
+          data,
+          { new: true, runValidators: true },
+        );
+
+        if (!profile) {
+          result.failed.push({
+            company_id,
+            operation: 'update_profile',
+            error: 'Profile not found for this company',
+          });
+          continue;
+        }
+
+        await invalidateCompanyCache(company_id, profile.about?.ticker_symbol);
+        
+        result.successful.push({
+          company_id,
+          operation: 'update_profile',
+        });
+      } catch (error: any) {
+        result.failed.push({
+          company_id: update.company_id,
+          operation: 'update_profile',
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk profile update completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk update profiles error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk profile update',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkUpsertCollection = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { collection, items } = req.body;
+    
+    if (!collection || !items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Collection name and items array are required',
+        details: { 
+          required: ['collection', 'items'],
+          validCollections: ['profiles', 'statistics', 'dividends', 'earnings', 'financial', 'holders', 'priceHistory']
+        },
+      });
+      return;
+    }
+
+    const validCollections = ['profiles', 'statistics', 'dividends', 'earnings', 'financial', 'holders', 'priceHistory'];
+    if (!validCollections.includes(collection)) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Invalid collection name',
+        details: { validCollections },
+      });
+      return;
+    }
+
+    let Model: any;
+    switch (collection) {
+      case 'profiles':
+        Model = Profile;
+        break;
+      case 'statistics':
+        Model = Statistics;
+        break;
+      case 'dividends':
+        Model = Dividends;
+        break;
+      case 'earnings':
+        Model = Earnings;
+        break;
+      case 'financial':
+        Model = Financial;
+        break;
+      case 'holders':
+        Model = Holders;
+        break;
+      case 'priceHistory':
+        Model = PriceHistory;
+        break;
+    }
+
+    const result: BulkCreateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const item of items) {
+      try {
+        const { company_id } = item;
+        
+        if (!company_id) {
+          result.failed.push({
+            operation: `upsert_${collection}`,
+            error: 'Company ID is required',
+            data: item,
+          });
+          continue;
+        }
+
+        const existing = await Model.findOne({ company_id });
+        let operation = 'updated';
+        
+        if (existing) {
+          await Model.findOneAndUpdate(
+            { company_id },
+            item,
+            { new: true, runValidators: true }
+          );
+        } else {
+          await Model.create(item);
+          operation = 'created';
+        }
+
+        await invalidateCompanyCache(company_id, item.ticker_symbol);
+        
+        result.successful.push({
+          company_id,
+          operation: `${operation}_${collection}`,
+        });
+      } catch (error: any) {
+        result.failed.push({
+          company_id: item.company_id,
+          operation: `upsert_${collection}`,
+          error: error.message,
+          data: item,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk upsert for ${collection} completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk upsert error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk upsert',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkDeleteCompanies = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { company_ids, collections } = req.body;
+    
+    if (!company_ids || !Array.isArray(company_ids) || company_ids.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Company IDs array is required and must not be empty',
+        details: { required: ['company_ids'] },
+      });
+      return;
+    }
+
+    const collectionsToDelete = collections || [
+      'profiles', 'statistics', 'dividends', 'earnings', 'financial', 'holders', 'priceHistory'
+    ];
+    
+    const validCollections = ['profiles', 'statistics', 'dividends', 'earnings', 'financial', 'holders', 'priceHistory'];
+    const invalidCollections = collectionsToDelete.filter((c: string) => !validCollections.includes(c));
+    
+    if (invalidCollections.length > 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Invalid collection names provided',
+        details: { invalidCollections, validCollections },
+      });
+      return;
+    }
+
+    const result: {
+      successful: Array<{ company_id: string; deleted_from: string[] }>;
+      failed: Array<{ company_id: string; error: string }>;
+    } = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const company_id of company_ids) {
+      try {
+        const deletedFrom: string[] = [];
+        
+        if (collectionsToDelete.includes('profiles')) {
+          const profile = await Profile.findOneAndDelete({ company_id });
+          if (profile) deletedFrom.push('profiles');
+        }
+        
+        if (collectionsToDelete.includes('statistics')) {
+          const stats = await Statistics.findOneAndDelete({ company_id });
+          if (stats) deletedFrom.push('statistics');
+        }
+        
+        if (collectionsToDelete.includes('dividends')) {
+          const dividends = await Dividends.findOneAndDelete({ company_id });
+          if (dividends) deletedFrom.push('dividends');
+        }
+        
+        if (collectionsToDelete.includes('earnings')) {
+          const earnings = await Earnings.findOneAndDelete({ company_id });
+          if (earnings) deletedFrom.push('earnings');
+        }
+        
+        if (collectionsToDelete.includes('financial')) {
+          const financial = await Financial.findOneAndDelete({ company_id });
+          if (financial) deletedFrom.push('financial');
+        }
+        
+        if (collectionsToDelete.includes('holders')) {
+          const holders = await Holders.findOneAndDelete({ company_id });
+          if (holders) deletedFrom.push('holders');
+        }
+        
+        if (collectionsToDelete.includes('priceHistory')) {
+          const priceHistory = await PriceHistory.findOneAndDelete({ company_id });
+          if (priceHistory) deletedFrom.push('priceHistory');
+        }
+        
+        if (deletedFrom.length > 0) {
+          await invalidateCompanyCache(company_id);
+          result.successful.push({ company_id, deleted_from: deletedFrom });
+        } else {
+          result.failed.push({ company_id, error: 'No data found for this company in specified collections' });
+        }
+      } catch (error: any) {
+        result.failed.push({ company_id, error: error.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk deletion completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk delete error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk deletion',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkImportCompanies = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { companies } = req.body;
+    
+    if (!companies || !Array.isArray(companies) || companies.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Companies array is required and must not be empty',
+        details: {
+          required: ['companies'],
+          companyFormat: {
+            company_id: 'string',
+            profile: 'object',
+            statistics: 'object',
+            dividends: 'object',
+            earnings: 'object',
+            financial: 'object',
+            holders: 'object',
+            priceHistory: 'object'
+          }
+        },
+      });
+      return;
+    }
+
+    const result: {
+      successful: Array<{ company_id: string; collections_created: string[] }>;
+      failed: Array<{ company_id: string; error: string; details?: any }>;
+    } = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const company of companies) {
+      const { company_id, profile, statistics, dividends, earnings, financial, holders, priceHistory } = company;
+      
+      if (!company_id) {
+        result.failed.push({
+          company_id: 'unknown',
+          error: 'Company ID is required for each company',
+          details: company,
+        });
+        continue;
+      }
+
+      const collectionsCreated: string[] = [];
+
+      try {
+        if (profile) {
+          const existingProfile = await Profile.findOne({ company_id });
+          if (!existingProfile) {
+            await Profile.create({ company_id, ...profile });
+            collectionsCreated.push('profile');
+          } else {
+            collectionsCreated.push('profile (already exists)');
+          }
+        }
+
+        if (statistics) {
+          const existingStats = await Statistics.findOne({ company_id });
+          if (!existingStats) {
+            const statsDoc = await Statistics.create({ company_id, ...statistics });
+            if ((statsDoc as any).addToKeyStatsHistory) {
+              (statsDoc as any).addToKeyStatsHistory();
+              await statsDoc.save();
+            }
+            collectionsCreated.push('statistics');
+          } else {
+            collectionsCreated.push('statistics (already exists)');
+          }
+        }
+
+        if (dividends) {
+          const existingDividends = await Dividends.findOne({ company_id });
+          if (!existingDividends) {
+            const divDoc = await Dividends.create({ company_id, ...dividends });
+            if ((divDoc as any).addDividendToHistory) {
+              (divDoc as any).addDividendToHistory();
+              await divDoc.save();
+            }
+            collectionsCreated.push('dividends');
+          } else {
+            collectionsCreated.push('dividends (already exists)');
+          }
+        }
+
+        if (earnings) {
+          const existingEarnings = await Earnings.findOne({ company_id });
+          if (!existingEarnings) {
+            const earnDoc = await Earnings.create({ company_id, ...earnings });
+            if ((earnDoc as any).addEarningsToHistory) {
+              (earnDoc as any).addEarningsToHistory('quarterly');
+              await earnDoc.save();
+            }
+            collectionsCreated.push('earnings');
+          } else {
+            collectionsCreated.push('earnings (already exists)');
+          }
+        }
+
+        if (financial) {
+          const existingFinancial = await Financial.findOne({ company_id });
+          if (!existingFinancial) {
+            const finDoc = await Financial.create({ company_id, ...financial });
+            if ((finDoc as any).addRevenueToHistory) {
+              (finDoc as any).addRevenueToHistory('quarterly');
+              (finDoc as any).addNetMarginToHistory('quarterly');
+              (finDoc as any).addDebtToHistory('quarterly');
+              await finDoc.save();
+            }
+            collectionsCreated.push('financial');
+          } else {
+            collectionsCreated.push('financial (already exists)');
+          }
+        }
+
+        if (holders) {
+          const existingHolders = await Holders.findOne({ company_id });
+          if (!existingHolders) {
+            const holdDoc = await Holders.create({ company_id, ...holders });
+            if ((holdDoc as any).addOwnershipToHistory) {
+              (holdDoc as any).addOwnershipToHistory();
+              await holdDoc.save();
+            }
+            collectionsCreated.push('holders');
+          } else {
+            collectionsCreated.push('holders (already exists)');
+          }
+        }
+
+        if (priceHistory) {
+          const existingPriceHistory = await PriceHistory.findOne({ company_id });
+          if (!existingPriceHistory) {
+            await PriceHistory.create({ company_id, ...priceHistory });
+            collectionsCreated.push('priceHistory');
+          } else {
+            collectionsCreated.push('priceHistory (already exists)');
+          }
+        }
+
+        await invalidateCompanyCache(company_id);
+        
+        result.successful.push({
+          company_id,
+          collections_created: collectionsCreated,
+        });
+      } catch (error: any) {
+        result.failed.push({
+          company_id,
+          error: error.message,
+          details: { collections_created_before_error: collectionsCreated },
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      code: 201,
+      message: `Bulk import completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk import error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk import',
       errorId: `ERR-${Date.now()}`,
     });
   }

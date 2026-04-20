@@ -432,7 +432,7 @@ const aboutSchema = new Schema<IAbout>(
 
 const ProfileSchema = new Schema<IProfile>(
   {
-    company_id: { type: String, required: true, index: true },
+    company_id: { type: String, required: true, unique: true },
     about: aboutSchema,
     shares: {
       exchange_listed_name: { type: String },
@@ -513,9 +513,9 @@ const returnsSchema = new Schema<IReturns>(
 
 const StatisticsSchema = new Schema<IStatistics>(
   {
-    company_id: { type: String, required: true, index: true },
+    company_id: { type: String, required: true, unique: true },
     company_name: { type: String, required: true },
-    ticker_symbol: { type: String, required: true, index: true },
+    ticker_symbol: { type: String, required: true },
     key_statistics: keyStatsSchema,
     returns: returnsSchema,
     growth_valuation: {
@@ -579,7 +579,7 @@ const PriceHistorySchema = new Schema<IPriceHistory>(
     company_id: {
       type: String,
       required: true,
-      index: true,
+      unique: true,
     },
     company_name: {
       type: String,
@@ -588,7 +588,6 @@ const PriceHistorySchema = new Schema<IPriceHistory>(
     ticker_symbol: {
       type: String,
       required: true,
-      index: true,
     },
     history: [
       {
@@ -632,9 +631,9 @@ const dividendHistorySchema = new Schema<IDividendHistory>(
 
 const DividendsSchema = new Schema<IDividends>(
   {
-    company_id: { type: String, required: true, index: true },
+    company_id: { type: String, required: true, unique: true },
     company_name: { type: String, required: true },
-    ticker_symbol: { type: String, required: true, index: true },
+    ticker_symbol: { type: String, required: true },
     events: {
       next_dividend_pay_date: { type: Date },
       last_dividend_pay_date: { type: Date },
@@ -726,9 +725,9 @@ const earningsHistorySchema = new Schema<IEarningsHistory>(
 
 const EarningsSchema = new Schema<IEarnings>(
   {
-    company_id: { type: String, required: true, index: true },
+    company_id: { type: String, required: true, unique: true },
     company_name: { type: String, required: true },
-    ticker_symbol: { type: String, required: true, index: true },
+    ticker_symbol: { type: String, required: true },
     events: {
       next_earnings_date: { type: Date },
       next_earnings_estimated_eps: { type: Number },
@@ -863,9 +862,9 @@ const financialStatementSchema = new Schema<IFinancialStatement>(
 
 const FinancialSchema = new Schema<IFinancial>(
   {
-    company_id: { type: String, required: true, index: true },
+    company_id: { type: String, required: true, unique: true },
     company_name: { type: String, required: true },
-    ticker_symbol: { type: String, required: true, index: true },
+    ticker_symbol: { type: String, required: true },
     annual_revenue_history: [
       {
         for_year: { type: Number, required: true },
@@ -1203,9 +1202,9 @@ const insiderTransactionSchema = new Schema<IInsiderTransaction>(
 
 const HoldersSchema = new Schema<IHolders>(
   {
-    company_id: { type: String, required: true, index: true },
+    company_id: { type: String, required: true, unique: true },
     company_name: { type: String, required: true },
-    ticker_symbol: { type: String, required: true, index: true },
+    ticker_symbol: { type: String, required: true },
     ownership_summary: {
       percent_institutions: { type: Number },
       percent_insiders: { type: Number },

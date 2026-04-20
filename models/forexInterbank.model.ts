@@ -97,7 +97,6 @@ forexInterbankSchema.pre<IForexInterbank>('save', function () {
   this.last_updated = new Date();
 });
 
-forexInterbankSchema.index({ bankCode: 1 });
 forexInterbankSchema.index({ code: 1 });
 
 const ForexInterbank = mongoose.model<IForexInterbank>('ForexInterbank', forexInterbankSchema);

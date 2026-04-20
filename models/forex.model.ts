@@ -61,7 +61,7 @@ const forexSchema = new Schema<IForex>(
     code: { 
       type: String, 
       required: true, 
-      unique: true 
+      unique: true
     },
     name: { 
       type: String, 
@@ -116,8 +116,6 @@ const forexSchema = new Schema<IForex>(
 forexSchema.pre<IForex>('save', function () {
   this.last_updated = new Date();
 });
-
-forexSchema.index({ code: 1 });
 
 const Forex = mongoose.model<IForex>('Forex', forexSchema);
 

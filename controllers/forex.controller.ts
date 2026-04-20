@@ -1190,3 +1190,1029 @@ export const clearPriceHistory = async (req: Request, res: Response): Promise<vo
     });
   }
 };
+interface BulkCreateResult {
+  successful: Array<{ code: string; operation: string; id?: string }>;
+  failed: Array<{ code?: string; operation: string; error: string; data?: any }>;
+}
+
+interface BulkUpdateResult {
+  successful: Array<{ code: string; operation: string }>;
+  failed: Array<{ code?: string; operation: string; error: string }>;
+}
+
+export const bulkCreateForex = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { forexPairs } = req.body;
+    
+    if (!forexPairs || !Array.isArray(forexPairs) || forexPairs.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Forex pairs array is required and must not be empty',
+        details: { required: ['forexPairs'] },
+      });
+      return;
+    }
+
+    const result: BulkCreateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const forexData of forexPairs) {
+      try {
+        const { code, currentPrice } = forexData;
+        
+        if (!code) {
+          result.failed.push({
+            operation: 'create_forex',
+            error: 'Forex code is required',
+            data: forexData,
+          });
+          continue;
+        }
+
+        if (!currentPrice) {
+          result.failed.push({
+            code,
+            operation: 'create_forex',
+            error: 'Current price is required',
+            data: forexData,
+          });
+          continue;
+        }
+
+        const existingForex = await Forex.findOne({ code });
+        if (existingForex) {
+          result.failed.push({
+            code,
+            operation: 'create_forex',
+            error: 'Forex pair already exists',
+            data: forexData,
+          });
+          continue;
+        }
+
+        if (forexData.from_code && forexData.from_code.length !== 3) {
+          result.failed.push({
+            code,
+            operation: 'create_forex',
+            error: 'From currency code must be exactly 3 characters',
+            data: forexData,
+          });
+          continue;
+        }
+
+        if (forexData.to_code && forexData.to_code.length !== 3) {
+          result.failed.push({
+            code,
+            operation: 'create_forex',
+            error: 'To currency code must be exactly 3 characters',
+            data: forexData,
+          });
+          continue;
+        }
+
+        const newForex = new Forex({
+          ...forexData,
+          from_code: forexData.from_code?.toUpperCase(),
+          to_code: forexData.to_code?.toUpperCase(),
+          percentage_change: forexData.percentage_change || 0,
+          last_updated: new Date(),
+        });
+
+        const savedForex = await newForex.save();
+
+        await PriceHistory.create({
+          forex_code: code,
+          history: [{
+            date: new Date(),
+            price: currentPrice,
+          }],
+        });
+
+        await invalidateCache(code);
+        
+        result.successful.push({
+          code,
+          operation: 'create_forex',
+          id: savedForex._id.toString(),
+        });
+      } catch (error: any) {
+        result.failed.push({
+          code: forexData.code,
+          operation: 'create_forex',
+          error: error.message,
+          data: forexData,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      code: 201,
+      message: `Bulk forex creation completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk create forex error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk forex creation',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkUpdateForex = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { updates } = req.body;
+    
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Updates array is required and must not be empty',
+        details: { required: ['updates'] },
+      });
+      return;
+    }
+
+    const result: BulkUpdateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const update of updates) {
+      try {
+        const { code, data } = update;
+        
+        if (!code || !data) {
+          result.failed.push({
+            code,
+            operation: 'update_forex',
+            error: 'Forex code and update data are required',
+          });
+          continue;
+        }
+
+        const forex = await Forex.findOne({ code });
+        if (!forex) {
+          result.failed.push({
+            code,
+            operation: 'update_forex',
+            error: 'Forex pair not found',
+          });
+          continue;
+        }
+
+        const updateOperations: any = {
+          $set: {
+            ...data,
+            last_updated: new Date(),
+          },
+        };
+
+        if (data.currentPrice !== undefined && data.currentPrice !== forex.currentPrice) {
+          const percentage_change = ((data.currentPrice - forex.currentPrice) / forex.currentPrice) * 100;
+          updateOperations.$set.currentPrice = data.currentPrice;
+          updateOperations.$set.percentage_change = parseFloat(percentage_change.toFixed(4));
+
+          await PriceHistory.findOneAndUpdate(
+            { forex_code: code },
+            {
+              $push: {
+                history: {
+                  $each: [{
+                    date: new Date(),
+                    price: data.currentPrice,
+                  }],
+                  $position: 0,
+                },
+              },
+            },
+            { upsert: true }
+          );
+        }
+
+        const updatedForex = await Forex.findOneAndUpdate(
+          { code },
+          updateOperations,
+          { new: true }
+        );
+
+        await invalidateCache(code);
+        
+        result.successful.push({
+          code,
+          operation: 'update_forex',
+        });
+      } catch (error: any) {
+        result.failed.push({
+          code: update.code,
+          operation: 'update_forex',
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk forex update completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk update forex error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk forex update',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkAddPriceHistoryEntries = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { entries } = req.body;
+    
+    if (!entries || !Array.isArray(entries) || entries.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Entries array is required and must not be empty',
+        details: { 
+          required: ['entries'],
+          entryFormat: { code: 'string', date: 'Date', price: 'number' }
+        },
+      });
+      return;
+    }
+
+    const result: BulkUpdateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const entry of entries) {
+      try {
+        const { code, date, price } = entry;
+        
+        if (!code || !price) {
+          result.failed.push({
+            code,
+            operation: 'add_price_entry',
+            error: 'Forex code and price are required',
+          });
+          continue;
+        }
+
+        const forex = await Forex.findOne({ code });
+        if (!forex) {
+          result.failed.push({
+            code,
+            operation: 'add_price_entry',
+            error: 'Forex pair not found',
+          });
+          continue;
+        }
+
+        const newPriceEntry = {
+          date: date ? new Date(date) : new Date(),
+          price: Number(price),
+        };
+
+        const priceHistory = await PriceHistory.findOneAndUpdate(
+          { forex_code: code },
+          {
+            $push: {
+              history: {
+                $each: [newPriceEntry],
+                $position: 0,
+              },
+            },
+          },
+          { upsert: true, new: true }
+        );
+
+        const MAX_HISTORY_ENTRIES = 5000;
+        if (priceHistory.history.length > MAX_HISTORY_ENTRIES) {
+          priceHistory.history = priceHistory.history.slice(0, MAX_HISTORY_ENTRIES);
+          await priceHistory.save();
+        }
+
+        await invalidateCache(code);
+        
+        result.successful.push({
+          code,
+          operation: 'add_price_entry',
+        });
+      } catch (error: any) {
+        result.failed.push({
+          code: entry.code,
+          operation: 'add_price_entry',
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk price entries added: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk add price entries error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk price entry addition',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkDeleteForex = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { codes } = req.body;
+    
+    if (!codes || !Array.isArray(codes) || codes.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Forex codes array is required and must not be empty',
+        details: { required: ['codes'] },
+      });
+      return;
+    }
+
+    const result: {
+      successful: Array<{ code: string; deleted_from: string[] }>;
+      failed: Array<{ code: string; error: string }>;
+    } = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const code of codes) {
+      try {
+        const deletedFrom: string[] = [];
+        
+        const deletedForex = await Forex.findOneAndDelete({ code });
+        if (deletedForex) {
+          deletedFrom.push('forex');
+        }
+        
+        const deletedHistory = await PriceHistory.findOneAndDelete({ forex_code: code });
+        if (deletedHistory) {
+          deletedFrom.push('priceHistory');
+        }
+        
+        if (deletedFrom.length > 0) {
+          await invalidateCache(code);
+          result.successful.push({ code, deleted_from: deletedFrom });
+        } else {
+          result.failed.push({ code, error: 'No forex data found for this code' });
+        }
+      } catch (error: any) {
+        result.failed.push({ code, error: error.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk forex deletion completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk delete forex error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk forex deletion',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkUpsertForex = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { items } = req.body;
+    
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Items array is required and must not be empty',
+        details: { required: ['items'] },
+      });
+      return;
+    }
+
+    const result: BulkCreateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const item of items) {
+      try {
+        const { code, currentPrice } = item;
+        
+        if (!code) {
+          result.failed.push({
+            operation: 'upsert_forex',
+            error: 'Forex code is required',
+            data: item,
+          });
+          continue;
+        }
+
+        const existing = await Forex.findOne({ code });
+        let operation = 'updated';
+        
+        if (existing) {
+          const updateOperations: any = {
+            $set: {
+              ...item,
+              last_updated: new Date(),
+            },
+          };
+
+          if (currentPrice !== undefined && currentPrice !== existing.currentPrice) {
+            const percentage_change = ((currentPrice - existing.currentPrice) / existing.currentPrice) * 100;
+            updateOperations.$set.currentPrice = currentPrice;
+            updateOperations.$set.percentage_change = parseFloat(percentage_change.toFixed(4));
+
+            await PriceHistory.findOneAndUpdate(
+              { forex_code: code },
+              {
+                $push: {
+                  history: {
+                    $each: [{
+                      date: new Date(),
+                      price: currentPrice,
+                    }],
+                    $position: 0,
+                  },
+                },
+              },
+              { upsert: true }
+            );
+          }
+
+          await Forex.findOneAndUpdate(
+            { code },
+            updateOperations,
+            { new: true, runValidators: true }
+          );
+        } else {
+          if (!currentPrice) {
+            result.failed.push({
+              code,
+              operation: 'upsert_forex',
+              error: 'Current price is required for new forex pairs',
+              data: item,
+            });
+            continue;
+          }
+
+          const newForex = new Forex({
+            ...item,
+            percentage_change: item.percentage_change || 0,
+            last_updated: new Date(),
+          });
+          
+          await newForex.save();
+
+          await PriceHistory.create({
+            forex_code: code,
+            history: [{
+              date: new Date(),
+              price: currentPrice,
+            }],
+          });
+          
+          operation = 'created';
+        }
+
+        await invalidateCache(code);
+        
+        result.successful.push({
+          code,
+          operation: `${operation}_forex`,
+        });
+      } catch (error: any) {
+        result.failed.push({
+          code: item.code,
+          operation: 'upsert_forex',
+          error: error.message,
+          data: item,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk forex upsert completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk upsert forex error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk forex upsert',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkUpdateForexPrices = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { prices } = req.body;
+    
+    if (!prices || !Array.isArray(prices) || prices.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Prices array is required and must not be empty',
+        details: { 
+          required: ['prices'],
+          priceFormat: { code: 'string', currentPrice: 'number' }
+        },
+      });
+      return;
+    }
+
+    const result: BulkUpdateResult = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const priceUpdate of prices) {
+      try {
+        const { code, currentPrice } = priceUpdate;
+        
+        if (!code || !currentPrice) {
+          result.failed.push({
+            code,
+            operation: 'update_price',
+            error: 'Forex code and current price are required',
+          });
+          continue;
+        }
+
+        const forex = await Forex.findOne({ code });
+        if (!forex) {
+          result.failed.push({
+            code,
+            operation: 'update_price',
+            error: 'Forex pair not found',
+          });
+          continue;
+        }
+
+        const updateOperations: any = {
+          $set: {
+            last_updated: new Date(),
+          },
+        };
+
+        if (currentPrice !== forex.currentPrice) {
+          const percentage_change = ((currentPrice - forex.currentPrice) / forex.currentPrice) * 100;
+          updateOperations.$set.currentPrice = currentPrice;
+          updateOperations.$set.percentage_change = parseFloat(percentage_change.toFixed(4));
+
+          await PriceHistory.findOneAndUpdate(
+            { forex_code: code },
+            {
+              $push: {
+                history: {
+                  $each: [{
+                    date: new Date(),
+                    price: currentPrice,
+                  }],
+                  $position: 0,
+                },
+              },
+            },
+            { upsert: true }
+          );
+        }
+
+        await Forex.findOneAndUpdate(
+          { code },
+          updateOperations,
+          { new: true }
+        );
+
+        await invalidateCache(code);
+        
+        result.successful.push({
+          code,
+          operation: 'update_price',
+        });
+      } catch (error: any) {
+        result.failed.push({
+          code: priceUpdate.code,
+          operation: 'update_price',
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk price updates completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk update prices error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk price updates',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkImportForex = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { forexList } = req.body;
+    
+    if (!forexList || !Array.isArray(forexList) || forexList.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Forex list array is required and must not be empty',
+        details: {
+          required: ['forexList'],
+          forexFormat: {
+            code: 'string (required)',
+            name: 'string (required)',
+            from_currency: 'string (required)',
+            from_code: 'string (3 chars, required)',
+            to_currency: 'string (required)',
+            to_code: 'string (3 chars, required)',
+            currentPrice: 'number (required)',
+            priceHistory: 'array of {date, price} (optional)'
+          }
+        },
+      });
+      return;
+    }
+
+    const result: {
+      successful: Array<{ code: string; collections_created: string[] }>;
+      failed: Array<{ code: string; error: string; details?: any }>;
+    } = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const forexData of forexList) {
+      const { code, name, from_currency, from_code, to_currency, to_code, currentPrice, priceHistory } = forexData;
+      
+      if (!code || !name || !from_currency || !from_code || !to_currency || !to_code || !currentPrice) {
+        result.failed.push({
+          code: code || 'unknown',
+          error: 'Missing required fields',
+          details: { required: ['code', 'name', 'from_currency', 'from_code', 'to_currency', 'to_code', 'currentPrice'] },
+        });
+        continue;
+      }
+
+      if (from_code.length !== 3 || to_code.length !== 3) {
+        result.failed.push({
+          code,
+          error: 'Currency codes must be exactly 3 characters',
+          details: { from_code, to_code },
+        });
+        continue;
+      }
+
+      const collectionsCreated: string[] = [];
+
+      try {
+        const existingForex = await Forex.findOne({ code });
+        if (!existingForex) {
+          const newForex = new Forex({
+            code,
+            name,
+            from_currency,
+            from_code: from_code.toUpperCase(),
+            to_currency,
+            to_code: to_code.toUpperCase(),
+            currentPrice,
+            percentage_change: forexData.percentage_change || 0,
+            monthly_change: forexData.monthly_change || 0,
+            yearly_change: forexData.yearly_change || 0,
+            last_updated: new Date(),
+          });
+          await newForex.save();
+          collectionsCreated.push('forex');
+        } else {
+          collectionsCreated.push('forex (already exists)');
+        }
+
+        const historyEntries = priceHistory || [{ date: new Date(), price: currentPrice }];
+        
+        const existingHistory = await PriceHistory.findOne({ forex_code: code });
+        if (!existingHistory) {
+          await PriceHistory.create({
+            forex_code: code,
+            history: historyEntries.map((entry: any) => ({
+              date: new Date(entry.date),
+              price: entry.price,
+            })),
+          });
+          collectionsCreated.push('priceHistory');
+        } else {
+          const newEntries = historyEntries.map((entry: any) => ({
+            date: new Date(entry.date),
+            price: entry.price,
+          }));
+          
+          await PriceHistory.findOneAndUpdate(
+            { forex_code: code },
+            {
+              $push: {
+                history: {
+                  $each: newEntries,
+                  $position: 0,
+                },
+              },
+            }
+          );
+          collectionsCreated.push('priceHistory (updated)');
+        }
+
+        const priceHistoryDoc = await PriceHistory.findOne({ forex_code: code });
+        if (priceHistoryDoc && priceHistoryDoc.history.length > 5000) {
+          priceHistoryDoc.history = priceHistoryDoc.history.slice(0, 5000);
+          await priceHistoryDoc.save();
+        }
+
+        await invalidateCache(code);
+        
+        result.successful.push({
+          code,
+          collections_created: collectionsCreated,
+        });
+      } catch (error: any) {
+        result.failed.push({
+          code,
+          error: error.message,
+          details: { collections_created_before_error: collectionsCreated },
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      code: 201,
+      message: `Bulk forex import completed: ${result.successful.length} successful, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk import forex error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk forex import',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkGetForex = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { codes, from_currency, to_currency, min_price, max_price, limit = 100, page = 1 } = req.body;
+
+    const query: any = {};
+    
+    if (codes && Array.isArray(codes) && codes.length > 0) {
+      query.code = { $in: codes };
+    }
+    
+    if (from_currency) {
+      query.from_currency = from_currency;
+    }
+    
+    if (to_currency) {
+      query.to_currency = to_currency;
+    }
+    
+    if (min_price !== undefined || max_price !== undefined) {
+      query.currentPrice = {};
+      if (min_price !== undefined) query.currentPrice.$gte = min_price;
+      if (max_price !== undefined) query.currentPrice.$lte = max_price;
+    }
+
+    const skip = (page - 1) * limit;
+    
+    const [forexPairs, total] = await Promise.all([
+      Forex.find(query).skip(skip).limit(limit).sort({ code: 1 }),
+      Forex.countDocuments(query),
+    ]);
+
+    const result = {
+      total,
+      page,
+      limit,
+      total_pages: Math.ceil(total / limit),
+      data: forexPairs,
+    };
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk get forex error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk forex fetch',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkExportForex = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { codes, includeHistory = false, historyLimit = 100 } = req.body;
+
+    const query: any = {};
+    if (codes && Array.isArray(codes) && codes.length > 0) {
+      query.code = { $in: codes };
+    }
+
+    const forexPairs = await Forex.find(query).sort({ code: 1 });
+
+    if (includeHistory) {
+      const exportData = [];
+      
+      for (const forex of forexPairs) {
+        const priceHistory = await PriceHistory.findOne(
+          { forex_code: forex.code },
+          { history: { $slice: historyLimit } }
+        );
+        
+        exportData.push({
+          ...forex.toObject(),
+          priceHistory: priceHistory ? priceHistory.history : [],
+        });
+      }
+      
+      res.status(200).json({
+        success: true,
+        code: 200,
+        data: exportData,
+        metadata: {
+          total_exported: exportData.length,
+          include_history: includeHistory,
+          history_limit: historyLimit,
+          export_date: new Date(),
+        },
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        code: 200,
+        data: forexPairs,
+        metadata: {
+          total_exported: forexPairs.length,
+          export_date: new Date(),
+        },
+      });
+    }
+  } catch (error: any) {
+    console.error('Bulk export forex error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk forex export',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkSyncForexPrices = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { priceUpdates } = req.body;
+    
+    if (!priceUpdates || !Array.isArray(priceUpdates) || priceUpdates.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Price updates array is required and must not be empty',
+        details: { 
+          required: ['priceUpdates'],
+          updateFormat: { code: 'string', price: 'number', date: 'Date (optional)' }
+        },
+      });
+      return;
+    }
+
+    const result: {
+      updated: Array<{ code: string; old_price: number; new_price: number; percentage_change: number }>;
+      created: Array<{ code: string; price: number }>;
+      failed: Array<{ code: string; error: string }>;
+    } = {
+      updated: [],
+      created: [],
+      failed: [],
+    };
+
+    for (const update of priceUpdates) {
+      try {
+        const { code, price, date } = update;
+        
+        if (!code || !price) {
+          result.failed.push({
+            code: code || 'unknown',
+            error: 'Forex code and price are required',
+          });
+          continue;
+        }
+
+        const forex = await Forex.findOne({ code });
+        
+        if (forex) {
+          const oldPrice = forex.currentPrice;
+          const percentage_change = ((price - oldPrice) / oldPrice) * 100;
+          
+          await Forex.findOneAndUpdate(
+            { code },
+            {
+              $set: {
+                currentPrice: price,
+                percentage_change: parseFloat(percentage_change.toFixed(4)),
+                last_updated: new Date(),
+              },
+            }
+          );
+          
+          await PriceHistory.findOneAndUpdate(
+            { forex_code: code },
+            {
+              $push: {
+                history: {
+                  $each: [{
+                    date: date ? new Date(date) : new Date(),
+                    price: price,
+                  }],
+                  $position: 0,
+                },
+              },
+            },
+            { upsert: true }
+          );
+          
+          result.updated.push({
+            code,
+            old_price: oldPrice,
+            new_price: price,
+            percentage_change: parseFloat(percentage_change.toFixed(4)),
+          });
+        } else {
+          result.failed.push({
+            code,
+            error: 'Forex pair not found. Use bulk import to create new pairs.',
+          });
+        }
+        
+        await invalidateCache(code);
+      } catch (error: any) {
+        result.failed.push({
+          code: update.code,
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk forex sync completed: ${result.updated.length} updated, ${result.created.length} created, ${result.failed.length} failed`,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Bulk sync forex error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk forex sync',
+      errorId: `ERR-${Date.now()}`,
+    });
+  }
+};

@@ -57,7 +57,7 @@ const commoditySchema = new Schema<ICommodity>(
     code: { 
       type: String, 
       required: true, 
-      unique: true 
+      unique: true
     },
     name: { 
       type: String, 
@@ -93,7 +93,6 @@ commoditySchema.pre<ICommodity>('save', function () {
   this.last_updated = new Date();
 });
 
-commoditySchema.index({ code: 1 });
 commoditySchema.index({ category: 1 });
 
 const Commodity = mongoose.model<ICommodity>('Commodity', commoditySchema);

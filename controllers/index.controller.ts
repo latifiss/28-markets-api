@@ -492,23 +492,33 @@ export const updateIndexPrice = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    const oldPrice = index.currentPrice;
+    const now = new Date();
+
     const updateOperations: any = {
       $set: {
-        last_updated: new Date(),
+        last_updated: now,
         currentPrice,
       },
       $push: {
         price_history: {
           $each: [
             {
-              date: new Date(),
-              price: index.currentPrice,
-            },
+              date: now,
+              price: currentPrice,
+            }
           ],
           $position: 0,
         },
       },
     };
+
+    if (oldPrice !== currentPrice) {
+      updateOperations.$push.price_history.$each.unshift({
+        date: now,
+        price: oldPrice,
+      });
+    }
 
     if (value_change !== undefined) {
       updateOperations.$set.value_change = value_change;
@@ -519,7 +529,7 @@ export const updateIndexPrice = async (req: Request, res: Response): Promise<voi
     }
 
     const updatedIndex = await Index.findOneAndUpdate(
-      { codeString },
+      { code: codeString },
       updateOperations,
       { new: true }
     );

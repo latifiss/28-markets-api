@@ -18,11 +18,16 @@ router.post('/indices', createIndex);
 router.put('/indices/:code', updateIndex);
 router.delete('/indices/:code', deleteIndex);
 router.post('/indices/:code/price', updateIndexPrice);
-
-router.get('/indices', unifiedAuth, rateLimiter, getAllIndices);
-router.get('/indices/:code', unifiedAuth, rateLimiter, getIndexByCode);
-router.get('/indices/:code/history', unifiedAuth, rateLimiter, getIndexHistory);
-
 router.post('/indices/:code/history', addIndexHistory);
+
+router.get('/indices', getAllIndices);
+router.get('/indices/:code', getIndexByCode);
+router.get('/indices/:code/history', getIndexHistory);
+
+router.get('/', unifiedAuth, rateLimiter, getAllIndices);
+router.get('/:code', unifiedAuth, rateLimiter, getIndexByCode);
+router.get('//:code/history', unifiedAuth, rateLimiter, getIndexHistory);
+
+router.post('/:code/history', addIndexHistory);
 
 export default router;

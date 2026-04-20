@@ -29,21 +29,22 @@ import {
   getAllCoinHistories,
   deleteCoinHistory,
   getCoinHistoryStats,
+  bulkUpsertCryptos,
 } from '../controllers/crypto.controller';
 
 const router = express.Router();
 
-router.post('/crypto', createCrypto);
-router.put('/crypto/symbol/:symbol', updateCryptoBySymbol);
-router.put('/crypto/id/:id', updateCryptoById);
-router.delete('/crypto/:symbol', deleteCrypto);
-router.post('/crypto/:symbol/price', updateCryptoPrice);
-router.post('/crypto/:symbol/history', addCryptoHistory);
+router.post('/', createCrypto);
+router.put('/symbol/:symbol', updateCryptoBySymbol);
+router.put('/id/:id', updateCryptoById);
+router.delete('/:symbol', deleteCrypto);
+router.post('/:symbol/price', updateCryptoPrice);
+router.post('/:symbol/history', addCryptoHistory);
 
-router.get('/crypto', getAllCryptos);
-router.get('/crypto/symbol/:symbol', getCryptoBySymbol);
-router.get('/crypto/id/:id', getCryptoById);
-router.get('/crypto/:symbol/history', getCryptoHistory);
+router.get('/', getAllCryptos);
+router.get('/symbol/:symbol', getCryptoBySymbol);
+router.get('/id/:id', getCryptoById);
+router.get('/:symbol/history', getCryptoHistory);
 
 router.post('/coingainers', createCoinGainer);
 router.post('/coingainers/bulk', bulkUpdateCoinGainers);
@@ -72,6 +73,8 @@ router.get('/coin-history/:symbol/stats', getCoinHistoryStats);
 
 router.delete('/coin-history/:id', deleteCoinHistory);
 
-router.get('/crypto/:symbol/comprehensive', getComprehensiveData);
+router.get('/:symbol/comprehensive', getComprehensiveData);
+
+router.post('/crypto/bulk/upsert', bulkUpsertCryptos);
 
 export default router;

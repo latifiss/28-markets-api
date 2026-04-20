@@ -15,27 +15,48 @@ import {
   updatePriceHistoryEntry,
   deletePriceHistoryEntry,
   clearPriceHistory,
+  bulkCreateForex,
+  bulkUpdateForex,
+  bulkDeleteForex,
+  bulkUpsertForex,
+  bulkUpdateForexPrices,
+  bulkAddPriceHistoryEntries,
+  bulkImportForex,
+  bulkGetForex,
+  bulkExportForex,
+  bulkSyncForexPrices,
 } from '../controllers/forex.controller';
 
 const router = express.Router();
 
-router.post('/forex', createForex);
-router.get('/forex', getAllForex);
-router.get('/forex/:code', getForex);
-router.put('/forex/:code', updateForex);
-router.delete('/forex/:code', deleteForex);
-router.post('/forex/:code/price', updateForexPrice);
+router.post('/', createForex);
+router.get('/', getAllForex);
+router.get('/:code', getForex);
+router.put('/:code', updateForex);
+router.delete('/:code', deleteForex);
+router.post('/:code/price', updateForexPrice);
 
-router.get('/forex/:code/history', getForexHistory);
-router.post('/forex/:code/history', addForexHistory);
-router.get('/forex/:code/history/period/:period', getForexHistoryByPeriod);
-router.get('/forex/:code/history/latest', getLatestPriceHistory);
+router.get('/:code/history', getForexHistory);
+router.post('/:code/history', addForexHistory);
+router.get('/:code/history/period/:period', getForexHistoryByPeriod);
+router.get('/:code/history/latest', getLatestPriceHistory);
 
-router.post('/forex/:code/entries', addPriceEntry);
-router.put('/forex/:code/latest', updateLatestPrice);
+router.post('/:code/entries', addPriceEntry);
+router.put('/:code/latest', updateLatestPrice);
 
-router.put('/forex/:code/history/:entryId', updatePriceHistoryEntry);
-router.delete('/forex/:code/history/:entryId', deletePriceHistoryEntry);
-router.delete('/forex/:code/history/clear/all', clearPriceHistory);
+router.put('/:code/history/:entryId', updatePriceHistoryEntry);
+router.delete('/:code/history/:entryId', deletePriceHistoryEntry);
+router.delete('/:code/history/clear/all', clearPriceHistory);
+
+router.post('/bulk', bulkCreateForex);
+router.put('/bulk', bulkUpdateForex);
+router.delete('/bulk', bulkDeleteForex);
+router.post('/bulk/upsert', bulkUpsertForex);
+router.post('/bulk/prices', bulkUpdateForexPrices);
+router.post('/bulk/history', bulkAddPriceHistoryEntries);
+router.post('/bulk/import', bulkImportForex);
+router.post('/bulk/query', bulkGetForex);
+router.post('/bulk/export', bulkExportForex);
+router.post('/bulk/sync', bulkSyncForexPrices);
 
 export default router;

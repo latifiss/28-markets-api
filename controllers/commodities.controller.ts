@@ -32,7 +32,9 @@ const deleteCacheByPattern = async (pattern: string): Promise<void> => {
     const client = await getRedisClient();
     if (client && typeof client.scanIterator === 'function') {
       for await (const key of client.scanIterator({ MATCH: pattern })) {
-        await client.del(key);
+        if (key && typeof key === 'string') {
+          await client.del(key);
+        }
       }
     }
   } catch (error: any) {

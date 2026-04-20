@@ -103,16 +103,6 @@ export const createCrypto = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.API_KEY) {
-      res.status(401).json({
-        success: false,
-        code: 401,
-        message: 'Invalid or missing API key',
-      });
-      return;
-    }
-
     const {
       id,
       symbol,
@@ -190,7 +180,7 @@ export const createCrypto = async (
 
     const newCrypto = new (Crypto as any)({
       id,
-      symbol: symbolStr.toUpperCase(),
+      symbol: symbolStr.toLowerCase(),
       name,
       image,
       current_price,
@@ -293,7 +283,12 @@ export const getCryptoById = async (
       return;
     }
 
-    const crypto = await (Crypto as any).findByCustomId(id);
+    const crypto = await (Crypto as any).findOne({ 
+      $or: [
+        { id: id },
+        { id: { $regex: new RegExp(`^${id}$`, 'i') } }
+      ]
+    });
 
     if (!crypto) {
       res.status(404).json({
@@ -329,16 +324,6 @@ export const updateCryptoById = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.API_KEY) {
-      res.status(401).json({
-        success: false,
-        code: 401,
-        message: 'Invalid or missing API key',
-      });
-      return;
-    }
-
     const { id } = req.params;
     const { current_price, ...updateData } = req.body;
 
@@ -355,7 +340,12 @@ export const updateCryptoById = async (
       return;
     }
 
-    const crypto = await (Crypto as any).findByCustomId(id);
+    const crypto = await (Crypto as any).findOne({ 
+      $or: [
+        { id: id },
+        { id: { $regex: new RegExp(`^${id}$`, 'i') } }
+      ]
+    });
 
     if (!crypto) {
       res.status(404).json({
@@ -405,7 +395,7 @@ export const updateCryptoById = async (
     }
 
     const updatedCrypto = await (Crypto as any).findOneAndUpdate(
-      { id: id },
+      { id: crypto.id },
       updateOperations,
       { new: true, runValidators: true },
     );
@@ -576,7 +566,7 @@ export const getCryptoBySymbol = async (
 ): Promise<void> => {
   try {
     const symbolParam = req.params.symbol;
-    const symbol = ensureString(symbolParam).toUpperCase();
+    const symbol = ensureString(symbolParam).toLowerCase();
 
     if (!symbol) {
       res.status(400).json({
@@ -881,12 +871,12 @@ export const getCryptoHistory = async (
 ): Promise<void> => {
   try {
     const symbolParam = req.params.symbol;
-    const symbol = ensureString(symbolParam).toUpperCase();
+    const searchTerm = ensureString(symbolParam).toLowerCase();
     const startDate = ensureString(req.query.startDate);
     const endDate = ensureString(req.query.endDate);
     const limit = ensureNumber(req.query.limit, 100);
 
-    if (!symbol) {
+    if (!searchTerm) {
       res.status(400).json({
         success: false,
         code: 400,
@@ -908,7 +898,7 @@ export const getCryptoHistory = async (
       return;
     }
 
-    const cacheKey = `crypto:symbol:${symbol}:history:${startDate}:${endDate}:${limit}`;
+    const cacheKey = `crypto:history:${searchTerm}:${startDate}:${endDate}:${limit}`;
     const cached = await getCache(cacheKey);
 
     if (cached) {
@@ -923,7 +913,15 @@ export const getCryptoHistory = async (
 
     const crypto = await (Crypto as any)
       .findOne({
-        symbol: symbol,
+        $or: [
+          { symbol: { $regex: new RegExp(`^${searchTerm}$`, 'i') } },
+          { symbol: searchTerm },
+          { symbol: searchTerm.toUpperCase() },
+          { symbol: searchTerm.toLowerCase() },
+          { id: searchTerm },
+          { id: { $regex: new RegExp(`^${searchTerm}$`, 'i') } },
+          { name: { $regex: new RegExp(`^${searchTerm}$`, 'i') } }
+        ]
       })
       .select('symbol name price_history');
 
@@ -932,7 +930,7 @@ export const getCryptoHistory = async (
         success: false,
         code: 404,
         message: 'Crypto not found',
-        details: { symbol },
+        details: { symbol: searchTerm },
       });
       return;
     }
@@ -987,25 +985,14 @@ export const addCryptoHistory = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.API_KEY) {
-      res.status(401).json({
-        success: false,
-        code: 401,
-        message: 'Invalid or missing API key',
-      });
-      return;
-    }
-
-    const symbolParam = req.params.symbol;
-    const symbol = ensureString(symbolParam).toUpperCase();
+    const id = req.params.symbol;
     const { date, price } = req.body;
 
-    if (!symbol) {
+    if (!id) {
       res.status(400).json({
         success: false,
         code: 400,
-        message: 'Symbol parameter is required',
+        message: 'ID parameter is required',
       });
       return;
     }
@@ -1035,13 +1022,30 @@ export const addCryptoHistory = async (
       return;
     }
 
+    const crypto = await (Crypto as any).findOne({
+      $or: [
+        { id: id },
+        { id: { $regex: new RegExp(`^${id}$`, 'i') } }
+      ]
+    });
+
+    if (!crypto) {
+      res.status(404).json({
+        success: false,
+        code: 404,
+        message: 'Crypto not found',
+        details: { id },
+      });
+      return;
+    }
+
     const newPriceEntry = {
       date: date || new Date(),
       price: parseFloat(price),
     };
 
     const updatedCrypto = await (Crypto as any).findOneAndUpdate(
-      { symbol: symbol },
+      { id: crypto.id },
       {
         $push: {
           price_history: {
@@ -1055,23 +1059,14 @@ export const addCryptoHistory = async (
       { new: true },
     );
 
-    if (!updatedCrypto) {
-      res.status(404).json({
-        success: false,
-        code: 404,
-        message: 'Crypto not found',
-        details: { symbol },
-      });
-      return;
-    }
-
-    await invalidateCryptoCache(symbol);
+    await invalidateCryptoCache(crypto.symbol);
 
     res.status(200).json({
       success: true,
       code: 200,
       message: 'Price history added successfully',
       data: {
+        id: updatedCrypto.id,
         symbol: updatedCrypto.symbol,
         new_price_entry: newPriceEntry,
         total_history_entries: updatedCrypto.price_history.length,
@@ -3051,6 +3046,93 @@ export const getCoinHistoryStats = async (
       code: 500,
       message: 'Internal server error fetching coin history stats',
       errorId: `COINHISTORY-ERR-${Date.now()}`,
+    });
+  }
+};
+
+export const bulkUpsertCryptos = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { cryptos } = req.body;
+
+    if (!cryptos || !Array.isArray(cryptos) || cryptos.length === 0) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'Cryptos array is required and must not be empty',
+      });
+      return;
+    }
+
+    const results = {
+      created: [],
+      updated: [],
+      failed: [],
+    };
+
+    for (const cryptoData of cryptos) {
+      try {
+        const existingCrypto = await (Crypto as any).findOne({ id: cryptoData.id });
+
+        if (existingCrypto) {
+          const updated = await (Crypto as any).findOneAndUpdate(
+            { id: cryptoData.id },
+            {
+              ...cryptoData,
+              symbol: cryptoData.symbol.toLowerCase(),
+              last_updated: new Date(),
+              $push: {
+                price_history: {
+                  $each: [{
+                    date: new Date(),
+                    price: cryptoData.current_price,
+                  }],
+                  $position: 0,
+                  $slice: 1000,
+                },
+              },
+            },
+            { new: true }
+          );
+          results.updated.push({ id: cryptoData.id, symbol: cryptoData.symbol });
+        } else {
+          const newCrypto = new (Crypto as any)({
+            ...cryptoData,
+            symbol: cryptoData.symbol.toLowerCase(),
+            price_history: [{
+              date: new Date(),
+              price: cryptoData.current_price,
+            }],
+            last_updated: new Date(),
+          });
+          await newCrypto.save();
+          results.created.push({ id: cryptoData.id, symbol: cryptoData.symbol });
+        }
+
+        await invalidateCryptoCache(cryptoData.symbol);
+      } catch (error: any) {
+        results.failed.push({
+          id: cryptoData.id,
+          symbol: cryptoData.symbol,
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      message: `Bulk upsert completed: ${results.created.length} created, ${results.updated.length} updated, ${results.failed.length} failed`,
+      data: results,
+    });
+  } catch (error: any) {
+    console.error('Bulk upsert cryptos error:', error);
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: 'Internal server error during bulk upsert',
     });
   }
 };

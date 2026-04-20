@@ -47,6 +47,15 @@ import {
   getTopLosersByExchange,
   getPerformanceByIndustry,
   getMarketMoversByExchange,
+  bulkCreateProfiles,
+  bulkUpdateProfiles,
+  bulkCreateStatistics,
+  bulkUpdateStatistics,
+  bulkCreatePriceHistory,
+  bulkAddPriceEntries,
+  bulkUpsertCollection,
+  bulkDeleteCompanies,
+  bulkImportCompanies,
 } from '../controllers/stocks.controller';
 
 const router = express.Router();
@@ -137,5 +146,15 @@ router.get('/equity/company/:company_id/all', getCompanyAllData);
 
 router.get('/equity/gse/status', getGSEMarketStatus);
 router.post('/equity/gse/status/update', manualGSEStatusUpdate);
+
+router.post('/equity/bulk/profiles', bulkCreateProfiles);
+router.put('/equity/bulk/profiles', bulkUpdateProfiles);
+router.post('/equity/bulk/statistics', bulkCreateStatistics);
+router.put('/equity/bulk/statistics', bulkUpdateStatistics);
+router.post('/equity/bulk/price-history', bulkCreatePriceHistory);
+router.post('/equity/bulk/price-history/entries', bulkAddPriceEntries);
+router.post('/equity/bulk/upsert', bulkUpsertCollection);
+router.delete('/equity/bulk/companies', bulkDeleteCompanies);
+router.post('/equity/bulk/import', bulkImportCompanies);
 
 export default router;
