@@ -3,6 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import morgan from 'morgan';
+import http from 'http';
 import { connectDB } from './db/index';
 import authRouter from './routes/auth';
 import usageRouter from './routes/usage';
@@ -17,6 +18,7 @@ import treasuryRoutes from './routes/treasury.routes';
 import stockRoutes from './routes/stocks.routes';
 import eventRoutes from './routes/event.routes';
 import billingRouter from './routes/billing';
+import { initRealtimeWebsocketServer } from './lib/realtime/ws';
 
 connectDB();
 
@@ -29,6 +31,8 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
 ];
+
+const server = http.createServer(app);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -71,6 +75,11 @@ const PORT = process.env.PORT || 6060;
 mongoose.connect(process.env.MONGODB_URI!)
   .then(() => {
     console.log('Connected to MongoDB');
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    initRealtimeWebsocketServer(server, {
+      path: process.env.WS_PATH || '/ws',
+      allowedOrigins,
+    });
+
+    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
   .catch(err => console.error(err));

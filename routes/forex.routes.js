@@ -1,0 +1,35 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const forex_controller_1 = require("../controllers/forex.controller");
+const router = express_1.default.Router();
+router.post('/', forex_controller_1.createForex);
+router.get('/', forex_controller_1.getAllForex);
+router.get('/:code', forex_controller_1.getForex);
+router.put('/:code', forex_controller_1.updateForex);
+router.delete('/:code', forex_controller_1.deleteForex);
+router.post('/:code/price', forex_controller_1.updateForexPrice);
+router.get('/:code/history', forex_controller_1.getForexHistory);
+router.post('/:code/history', forex_controller_1.addForexHistory);
+router.get('/:code/history/period/:period', forex_controller_1.getForexHistoryByPeriod);
+router.get('/:code/history/latest', forex_controller_1.getLatestPriceHistory);
+router.post('/:code/entries', forex_controller_1.addPriceEntry);
+router.put('/:code/latest', forex_controller_1.updateLatestPrice);
+router.put('/:code/history/:entryId', forex_controller_1.updatePriceHistoryEntry);
+router.delete('/:code/history/:entryId', forex_controller_1.deletePriceHistoryEntry);
+router.delete('/:code/history/clear/all', forex_controller_1.clearPriceHistory);
+router.post('/bulk', forex_controller_1.bulkCreateForex);
+router.put('/bulk', forex_controller_1.bulkUpdateForex);
+router.delete('/bulk', forex_controller_1.bulkDeleteForex);
+router.post('/bulk/upsert', forex_controller_1.bulkUpsertForex);
+router.post('/bulk/prices', forex_controller_1.bulkUpdateForexPrices);
+router.post('/bulk/history', forex_controller_1.bulkAddPriceHistoryEntries);
+router.post('/bulk/import', forex_controller_1.bulkImportForex);
+router.post('/bulk/query', forex_controller_1.bulkGetForex);
+router.post('/bulk/export', forex_controller_1.bulkExportForex);
+router.post('/bulk/sync', forex_controller_1.bulkSyncForexPrices);
+exports.default = router;
+//# sourceMappingURL=forex.routes.js.map
