@@ -469,7 +469,6 @@ const deleteHandler = async (
 
     let { id } = req.params;
 
-    // Ensure id is a string, not an array
     if (Array.isArray(id)) {
       id = id[0];
     }
@@ -590,7 +589,6 @@ const getHistoryHandler = async (
   }
 };
 
-// GDP Growth Quarterly
 export const createGDPGrowthQuarterly = async (
   req: Request,
   res: Response,
@@ -621,7 +619,6 @@ export const getGDPGrowthQuarterlyHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(GDPGrowthQuarterly, req, res, 'GDP Growth Quarterly');
 
-// GDP Growth Annual
 export const createGDPGrowthAnnual = async (
   req: Request,
   res: Response,
@@ -652,7 +649,6 @@ export const getGDPGrowthAnnualHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(GDPGrowthAnnual, req, res, 'GDP Growth Annual');
 
-// Government GDP Value
 export const createGovernmentGDPValue = async (
   req: Request,
   res: Response,
@@ -683,7 +679,6 @@ export const getGovernmentGDPValueHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(GovernmentGDPValue, req, res, 'Government GDP Value');
 
-// Interest Rate
 export const createInterestRate = async (
   req: Request,
   res: Response,
@@ -714,7 +709,6 @@ export const getInterestRateHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(InterestRate, req, res, 'Interest Rate');
 
-// Inflation Rate
 export const createInflationRate = async (
   req: Request,
   res: Response,
@@ -745,7 +739,6 @@ export const getInflationRateHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(InflationRate, req, res, 'Inflation Rate');
 
-// Unemployment Rate
 export const createUnemploymentRate = async (
   req: Request,
   res: Response,
@@ -776,7 +769,6 @@ export const getUnemploymentRateHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(UnemploymentRate, req, res, 'Unemployment Rate');
 
-// Balance of Trade
 export const createBalanceOfTrade = async (
   req: Request,
   res: Response,
@@ -807,7 +799,6 @@ export const getBalanceOfTradeHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(BalanceOfTrade, req, res, 'Balance of Trade');
 
-// Government Debt to GDP
 export const createGovernmentDebtToGDP = async (
   req: Request,
   res: Response,
@@ -838,7 +829,6 @@ export const getGovernmentDebtToGDPHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(GovernmentDebtToGDP, req, res, 'Government Debt to GDP');
 
-// Government Debt Value
 export const createGovernmentDebtValue = async (
   req: Request,
   res: Response,
@@ -869,7 +859,6 @@ export const getGovernmentDebtValueHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(GovernmentDebtValue, req, res, 'Government Debt Value');
 
-// Government Budget Value
 export const createGovernmentBudgetValue = async (
   req: Request,
   res: Response,
@@ -900,7 +889,6 @@ export const getGovernmentBudgetValueHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(GovernmentBudgetValue, req, res, 'Government Budget Value');
 
-// Government Revenues
 export const createGovernmentRevenues = async (
   req: Request,
   res: Response,
@@ -931,7 +919,6 @@ export const getGovernmentRevenuesHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(GovernmentRevenues, req, res, 'Government Revenues');
 
-// Fiscal Expenditure
 export const createFiscalExpenditure = async (
   req: Request,
   res: Response,
@@ -962,7 +949,6 @@ export const getFiscalExpenditureHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(FiscalExpenditure, req, res, 'Fiscal Expenditure');
 
-// Government Spending
 export const createGovernmentSpending = async (
   req: Request,
   res: Response,
@@ -993,7 +979,6 @@ export const getGovernmentSpendingHistory = async (
   res: Response,
 ): Promise<void> => getHistoryHandler(GovernmentSpending, req, res, 'Government Spending');
 
-// Bulk update for mixed indicator types
 export const bulkUpdateIndicators = async (
   req: Request,
   res: Response,

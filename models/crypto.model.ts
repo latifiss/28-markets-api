@@ -277,7 +277,6 @@ const syncWithCrypto = async () => {
       }
     }
 
-    // Clean up old entries (optional)
     await CoinGainers.deleteMany({ last_updated: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
     await CoinLosers.deleteMany({ last_updated: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
 
