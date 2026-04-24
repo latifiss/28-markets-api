@@ -85,7 +85,21 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    res.json({ user: { id: user._id, email: user.email, name: user.name, isActive: user.isActive } });
+    
+    res.json({ 
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        isActive: user.isActive,
+        tier: user.tier,
+        stripeCustomerId: user.stripeCustomerId,
+        subscriptionStatus: user.subscriptionStatus,
+        currentPeriodEnd: user.currentPeriodEnd,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

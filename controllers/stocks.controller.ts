@@ -10,6 +10,7 @@ import {
   PriceHistory,
 } from '../models/stocks.model';
 import { getRedisClient } from '../lib/redis';
+import { publishStockUpdate } from '../lib/realtime/ws';
 
 const setCache = async (
   key: string,
@@ -1724,6 +1725,7 @@ export const updatePriceHistory = async (
     }
 
     await invalidateCompanyCache(company_id as string, priceHistory.ticker_symbol);
+    publishStockUpdate({ company_id: company_id as string, ticker_symbol: priceHistory.ticker_symbol }, priceHistory);
 
     res.status(200).json({
       success: true,
@@ -2637,6 +2639,10 @@ export const addPriceEntry = async (
 
     await priceHistory.save();
     await invalidateCompanyCache(company_id as string, priceHistory.ticker_symbol);
+    publishStockUpdate(
+      { company_id: company_id as string, ticker_symbol: priceHistory.ticker_symbol },
+      { event: 'price_entry_added', newEntry: { date: new Date(date), price: String(price) } }
+    );
 
     res.status(200).json({
       success: true,
@@ -2707,6 +2713,10 @@ export const updateLatestPrice = async (
 
     await priceHistory.save();
     await invalidateCompanyCache(company_id as string, priceHistory.ticker_symbol);
+    publishStockUpdate(
+      { company_id: company_id as string, ticker_symbol: priceHistory.ticker_symbol },
+      { event: 'latest_price_updated', latestPrice: newEntry }
+    );
 
     res.status(200).json({
       success: true,

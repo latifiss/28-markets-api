@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import ForexInterbank, { PriceHistory } from '../models/forexInterbank.model';
 import { getRedisClient } from '../lib/redis';
+import { publishForexInterbankUpdate } from '../lib/realtime/ws';
 
 const setCache = async (key: string, data: any, expirationInSeconds = 86400): Promise<void> => {
   try {
@@ -188,6 +189,7 @@ export const createInterbankPair = async (req: Request, res: Response): Promise<
     });
 
     await invalidateCache(code, savedPair._id.toString(), bankCode);
+    publishForexInterbankUpdate({ id: savedPair._id.toString(), code, bankCode }, savedPair);
 
     res.status(201).json({
       success: true,
@@ -382,6 +384,7 @@ export const updateInterbankPair = async (req: Request, res: Response): Promise<
     }
 
     await invalidateCache(updatedPair.code, id as string, updatedPair.bankCode);
+    publishForexInterbankUpdate({ id: id as string, code: updatedPair.code, bankCode: updatedPair.bankCode }, updatedPair);
 
     res.status(200).json({
       success: true,
@@ -1089,6 +1092,7 @@ export const updatePrices = async (
     );
 
     await invalidateCache(updatedPair.code, id, updatedPair.bankCode);
+    publishForexInterbankUpdate({ id, code: updatedPair.code, bankCode: updatedPair.bankCode }, updatedPair);
 
     res.status(200).json({
       success: true,

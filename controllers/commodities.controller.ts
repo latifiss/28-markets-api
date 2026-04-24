@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import Commodity, { PriceHistory } from '../models/commodity.model';
 import { getRedisClient } from '../lib/redis';
+import { publishCommodityUpdate } from '../lib/realtime/ws';
 
 const setCache = async (key: string, data: any, expirationInSeconds = 3600): Promise<void> => {
   try {
@@ -218,6 +219,7 @@ export const createCommodity = async (req: Request, res: Response): Promise<void
     });
 
     await invalidateCache(code);
+    publishCommodityUpdate(code, commodity);
 
     res.status(201).json({
       success: true,
@@ -323,6 +325,7 @@ export const updateCommodity = async (req: Request, res: Response): Promise<void
     }
 
     await invalidateCache(code);
+    publishCommodityUpdate(code, updatedCommodity);
 
     res.status(200).json({
       success: true,
@@ -634,6 +637,7 @@ export const updateCommodityPrice = async (req: Request, res: Response): Promise
     );
 
     await invalidateCache(code);
+    publishCommodityUpdate(code, updatedCommodity);
 
     res.status(200).json({
       success: true,
@@ -777,6 +781,7 @@ export const updateLatestPrice = async (req: Request, res: Response): Promise<vo
     await commodity.save();
 
     await invalidateCache(code);
+    publishCommodityUpdate(code, commodity);
 
     res.status(200).json({
       success: true,

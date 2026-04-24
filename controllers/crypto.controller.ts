@@ -11,6 +11,7 @@ import {
   getTopLosers as getTopLosersFromModel,
 } from '../models/crypto.model';
 import { getRedisClient } from '../lib/redis';
+import { publishCryptoUpdate, broadcast } from '../lib/realtime/ws';
 
 const ensureString = (value: any): string => {
   if (Array.isArray(value)) {
@@ -205,6 +206,7 @@ export const createCrypto = async (
 
     const savedCrypto = await newCrypto.save();
     await invalidateCryptoCache(savedCrypto.symbol);
+    publishCryptoUpdate(savedCrypto.symbol, savedCrypto);
 
     res.status(201).json({
       success: true,
@@ -401,6 +403,7 @@ export const updateCryptoById = async (
     );
 
     await invalidateCryptoCache(updatedCrypto.symbol);
+    publishCryptoUpdate(updatedCrypto.symbol, updatedCrypto);
 
     res.status(200).json({
       success: true,
@@ -735,6 +738,7 @@ export const updateCryptoBySymbol = async (
     );
 
     await invalidateCryptoCache(symbol);
+    publishCryptoUpdate(updatedCrypto.symbol ?? symbol, updatedCrypto);
 
     res.status(200).json({
       success: true,
@@ -1189,6 +1193,7 @@ export const updateCryptoPrice = async (
     );
 
     await invalidateCryptoCache(symbol);
+    publishCryptoUpdate(updatedCrypto.symbol ?? symbol, updatedCrypto);
 
     res.status(200).json({
       success: true,
@@ -3066,7 +3071,11 @@ export const bulkUpsertCryptos = async (
       return;
     }
 
-    const results = {
+    const results: {
+      created: Array<{ id: any; symbol: any }>;
+      updated: Array<{ id: any; symbol: any }>;
+      failed: Array<{ id: any; symbol: any; error: string }>;
+    } = {
       created: [],
       updated: [],
       failed: [],
@@ -3097,6 +3106,7 @@ export const bulkUpsertCryptos = async (
             { new: true }
           );
           results.updated.push({ id: cryptoData.id, symbol: cryptoData.symbol });
+          publishCryptoUpdate(updated?.symbol ?? cryptoData.symbol, updated ?? cryptoData);
         } else {
           const newCrypto = new (Crypto as any)({
             ...cryptoData,
@@ -3109,6 +3119,7 @@ export const bulkUpsertCryptos = async (
           });
           await newCrypto.save();
           results.created.push({ id: cryptoData.id, symbol: cryptoData.symbol });
+          publishCryptoUpdate(newCrypto.symbol ?? cryptoData.symbol, newCrypto);
         }
 
         await invalidateCryptoCache(cryptoData.symbol);
@@ -3127,6 +3138,9 @@ export const bulkUpsertCryptos = async (
       message: `Bulk upsert completed: ${results.created.length} created, ${results.updated.length} updated, ${results.failed.length} failed`,
       data: results,
     });
+
+    // A light summary event for clients that only care about "something changed".
+    broadcast('crypto', 'bulk_upsert_completed', results);
   } catch (error: any) {
     console.error('Bulk upsert cryptos error:', error);
     res.status(500).json({

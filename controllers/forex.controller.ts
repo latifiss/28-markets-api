@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import Forex, { PriceHistory } from '../models/forex.model';
 import { getRedisClient } from '../lib/redis';
+import { publishForexUpdate } from '../lib/realtime/ws';
 
 const setCache = async (key: string, data: any, expirationInSeconds = 3600): Promise<void> => {
   try {
@@ -167,6 +168,7 @@ export const createForex = async (req: Request, res: Response): Promise<void> =>
     });
 
     await invalidateCache(code);
+    publishForexUpdate(code, savedForex);
 
     res.status(201).json({
       success: true,
@@ -378,6 +380,7 @@ export const updateForex = async (req: Request, res: Response): Promise<void> =>
     }
 
     await invalidateCache(code);
+    publishForexUpdate(code, updatedForex);
 
     res.status(200).json({
       success: true,
@@ -695,6 +698,7 @@ export const updateForexPrice = async (req: Request, res: Response): Promise<voi
     );
 
     await invalidateCache(code);
+    publishForexUpdate(code, updatedForex);
 
     res.status(200).json({
       success: true,
