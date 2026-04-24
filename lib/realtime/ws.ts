@@ -32,7 +32,6 @@ export function initRealtimeWebsocketServer(server: http.Server, opts?: { path?:
     server,
     path,
     verifyClient: (info: any, done: (res: boolean, code?: number, name?: string) => void) => {
-      // If you don't set Origin in a WS client (e.g. some backends), allow it.
       const origin = info.origin;
       if (!origin || allowedOrigins.length === 0) return done(true);
       return done(allowedOrigins.includes(origin));
@@ -107,7 +106,6 @@ export function broadcast(topic: Topic, event: string, data: unknown) {
     const state = clientState.get(ws);
     if (!state) continue;
 
-    // Match either exact topic or a wildcard "forex" style subscription.
     if (!state.topics.has(topic) && !state.topics.has(topic.split(':')[0])) continue;
     ws.send(msg);
   }
@@ -118,7 +116,6 @@ export function publishForexUpdate(code: string, forex: unknown) {
     broadcast('forex', 'updated', { code, forex });
     broadcast(`forex:${code}`, 'updated', forex);
   } catch {
-    // Never fail the main HTTP request because realtime couldn't publish.
   }
 }
 
@@ -127,7 +124,6 @@ export function publishCommodityUpdate(code: string, commodity: unknown) {
     broadcast('commodity', 'updated', { code, commodity });
     broadcast(`commodity:${code}`, 'updated', commodity);
   } catch {
-    // Never fail the main HTTP request because realtime couldn't publish.
   }
 }
 
@@ -137,7 +133,6 @@ export function publishCryptoUpdate(symbol: string, crypto: unknown) {
     broadcast('crypto', 'updated', { symbol: sym, crypto });
     broadcast(`crypto:${sym}`, 'updated', crypto);
   } catch {
-    // Never fail the main HTTP request because realtime couldn't publish.
   }
 }
 
@@ -147,7 +142,6 @@ export function publishForexInterbankUpdate(key: { id?: string; code?: string; b
     if (key.bankCode) broadcast(`forexInterbank:${key.bankCode}`, 'updated', pair);
     if (key.code) broadcast(`forexInterbank:code:${key.code}`, 'updated', pair);
   } catch {
-    // Never fail the main HTTP request because realtime couldn't publish.
   }
 }
 
@@ -157,7 +151,6 @@ export function publishStockUpdate(key: { company_id?: string; ticker_symbol?: s
     if (key.company_id) broadcast(`stocks:${key.company_id}`, 'updated', payload);
     if (key.ticker_symbol) broadcast(`stocks:ticker:${key.ticker_symbol}`, 'updated', payload);
   } catch {
-    // Never fail the main HTTP request because realtime couldn't publish.
   }
 }
 

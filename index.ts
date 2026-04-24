@@ -11,7 +11,6 @@ export const server = http.createServer(app);
 const PORT = process.env.PORT || 6060;
 
 export async function start() {
-  // Optional extra connection management/logging (kept for prod runs)
   connectDB();
 
   await mongoose.connect(process.env.MONGODB_URI!);
@@ -23,7 +22,6 @@ export async function start() {
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 
-// Only auto-start when running the file directly (not when imported by Jest).
 if (require.main === module) {
   start().catch((err) => console.error(err));
 }
