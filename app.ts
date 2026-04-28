@@ -20,6 +20,9 @@ export const allowedOrigins = [
   'http://localhost:4000',
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://28-markets.vercel.app',
+  'https://28-markets.com',
+  'https://www.28-markets.com',
 ];
 
 export function createApp() {
