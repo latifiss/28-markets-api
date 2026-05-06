@@ -26,7 +26,7 @@ router.get('/indices/:code/history', getIndexHistory);
 
 router.get('/', unifiedAuth, rateLimiter, getAllIndices);
 router.get('/:code', unifiedAuth, rateLimiter, getIndexByCode);
-router.get('//:code/history', unifiedAuth, rateLimiter, getIndexHistory);
+router.get('/:code/history', unifiedAuth, rateLimiter, getIndexHistory);
 
 router.post('/:code/history', addIndexHistory);
 
