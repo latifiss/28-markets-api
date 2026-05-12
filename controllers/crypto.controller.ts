@@ -941,7 +941,15 @@ export const getCryptoHistory = async (
 
     let priceHistory = crypto.price_history || [];
 
-    if (startDate || endDate) {
+    // Default to 5 days if no date range specified
+    if (!startDate && !endDate) {
+      const now = new Date();
+      const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+      priceHistory = priceHistory.filter((entry: any) => {
+        const entryDate = new Date(entry.date);
+        return entryDate >= fiveDaysAgo;
+      });
+    } else if (startDate || endDate) {
       const start = startDate ? new Date(startDate) : new Date(0);
       const end = endDate ? new Date(endDate) : new Date();
 

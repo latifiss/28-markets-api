@@ -264,7 +264,7 @@ export const updatePriceHistory = async (req: Request, res: Response): Promise<v
 
 export const getPriceHistory = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { limit = 100, days } = req.query;
+    const { limit = 100, days = 5 } = req.query;
     const cacheKey = `goldbod:price-history:limit=${limit}:days=${days}`;
     
     const cached = await getCache(cacheKey);
@@ -310,7 +310,7 @@ export const getPriceHistory = async (req: Request, res: Response): Promise<void
       history: result.history,
       metadata: {
         limit: Number(limit),
-        days: days ? Number(days) : null,
+        days: Number(days),
       }
     });
   } catch (error: any) {

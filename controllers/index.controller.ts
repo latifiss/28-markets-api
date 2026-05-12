@@ -378,10 +378,18 @@ export const getIndexHistory = async (req: Request, res: Response): Promise<void
       return;
     }
 
+    // Limit price_history to last 5 days by default
+    const now = new Date();
+    const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+    const limitedHistory = (index.price_history || []).filter((entry: any) => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= fiveDaysAgo;
+    });
+
     const result = {
       code: index.code,
       name: index.name,
-      price_history: index.price_history,
+      price_history: limitedHistory,
     };
 
     await setCache(cacheKey, result);

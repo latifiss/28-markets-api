@@ -59,6 +59,8 @@ const getDateRange = (period: string): Date | null => {
   const now = new Date();
   
   switch (period) {
+    case '5d':
+      return new Date(now.setDate(now.getDate() - 5));
     case '1d':
       return new Date(now.setDate(now.getDate() - 1));
     case '1w':
@@ -412,7 +414,7 @@ export const deleteCommodity = async (req: Request, res: Response): Promise<void
 export const getCommodityHistory = async (req: Request, res: Response): Promise<void> => {
   try {
     const code = paramToString(req.params.code);
-    const { period = 'all', limit = 100 } = req.query;
+    const { period = '5d', limit = 100 } = req.query;
 
     const cacheKey = `commodity:pricehistory:${code}:${period}:${limit}`;
     const cached = await getCache(cacheKey);
@@ -816,7 +818,7 @@ export const getCommodityHistoryByPeriod = async (req: Request, res: Response): 
     const { period } = req.params;
     const { limit = 100 } = req.query;
 
-    const validPeriods = ['1d', '1w', '1m', '3m', '6m', '1y', '5y', '10y', '20y', 'all'];
+    const validPeriods = ['5d', '1d', '1w', '1m', '3m', '6m', '1y', '5y', '10y', '20y', 'all'];
     
     if (!validPeriods.includes(period as string)) {
       res.status(400).json({
