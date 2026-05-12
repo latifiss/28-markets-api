@@ -1790,7 +1790,31 @@ export const getCompanyPriceHistory = async (
       return;
     }
 
-    const priceHistory = await PriceHistory.findOne({ company_id });
+    // Limit to last 5 days by default
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - 5 * 24 * 60 * 60 * 1000);
+
+    const priceHistory = await (PriceHistory as any).findOne(
+      { company_id },
+      {
+        company_id: 1,
+        company_name: 1,
+        ticker_symbol: 1,
+        history: {
+          $filter: {
+            input: '$history',
+            as: 'entry',
+            cond: {
+              $and: [
+                { $gte: ['$$entry.date', startDate] },
+                { $lte: ['$$entry.date', endDate] },
+              ],
+            },
+          },
+        },
+      },
+    ).sort({ 'history.date': 1 });
+
     if (!priceHistory) {
       res.status(404).json({
         success: false,
@@ -1807,6 +1831,9 @@ export const getCompanyPriceHistory = async (
       success: true,
       code: 200,
       fromCache: false,
+      period: '5d',
+      startDate,
+      endDate,
       data: priceHistory,
     });
   } catch (error: any) {
