@@ -127,7 +127,6 @@ const treasuryBondSchema = new Schema<ITreasuryBond>(
   }
 );
 
-treasuryBondSchema.index({ name: 1 });
 treasuryBondSchema.index({ maturity: 1 });
 treasuryBondSchema.index({ type: 1 });
 treasuryBondSchema.index({ discount_rate: -1 });
