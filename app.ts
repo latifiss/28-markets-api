@@ -75,7 +75,7 @@ export function createApp() {
     });
   });
 
-  // IP guard runs before credentials are parsed; identity limits run after optional auth.
+  // IP guard runs before credentials are parsed; identity limits run after credential validation.
   app.use(
     '/api/v1',
     apiIpRateLimit,
@@ -102,7 +102,7 @@ export function createApp() {
 
   app.use('/api/v1', v1Routes);
 
-  app.get('/', (_req, res) => {
+  app.get('/', requireApiAuthentication, (_req, res) => {
     res.json({
       name: '28 Markets API',
       status: 'operational',
