@@ -1,20 +1,45 @@
-import mongoose, { Schema, Document, Types } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IApiKey extends Document {
   userId: Types.ObjectId;
-  key: string;
+  key?: string;
+  keyHash?: string;
   description?: string;
   revoked: boolean;
   createdAt: Date;
 }
 
-const apiKeySchema: Schema = new Schema({
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  key: { type: String, required: true, unique: true },
-  description: { type: String },
-  revoked: { type: Boolean, default: false },
-}, {
-  timestamps: { createdAt: true, updatedAt: false },
-});
+const apiKeySchema = new Schema<IApiKey>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+    // Legacy plaintext keys remain optional for lazy migration.
+    key: {
+      type: String,
+      required: false,
+      select: false,
+    },
+    keyHash: {
+      type: String,
+      required: false,
+      unique: true,
+      sparse: true,
+      select: false,
+    },
+    description: String,
+    revoked: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
+apiKeySchema.index({ userId: 1, revoked: 1, createdAt: -1 });
 
 export default mongoose.model<IApiKey>('ApiKey', apiKeySchema);

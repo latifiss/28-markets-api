@@ -5,32 +5,18 @@ import {
   generateNewApiKey,
   getProfile,
   getApiKeys,
+  deleteApiKey,
 } from '../controllers/auth.controller';
 import { authenticateToken } from '../middleware/auth';
 import { authRateLimit } from '../middleware/rateLimit';
-import { tieredUsage } from '../middleware/usage';
 
 const router = express.Router();
 
 router.post('/register', authRateLimit, register);
 router.post('/login', authRateLimit, login);
-
-router.post(
-  '/api-key',
-  authenticateToken,
-  generateNewApiKey
-);
-
-router.get(
-  '/api-keys',
-  authenticateToken,
-  getApiKeys
-);
-
-router.get(
-  '/profile',
-  authenticateToken,
-  getProfile
-);
+router.get('/me', authenticateToken, getProfile);
+router.get('/api-keys', authenticateToken, getApiKeys);
+router.post('/api-keys', authenticateToken, generateNewApiKey);
+router.delete('/api-keys/:keyId', authenticateToken, deleteApiKey);
 
 export default router;

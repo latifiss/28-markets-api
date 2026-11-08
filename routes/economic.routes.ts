@@ -79,99 +79,87 @@ import {
   deleteGovernmentSpending,
   getGovernmentSpendingHistory,
   bulkUpdateIndicators,
-  setCache,
-  getCache,
 } from '../controllers/economic.controller';
-import { apiKeyRateLimit } from '../middleware/rateLimit';
+import { setCache, getCache } from '../lib/cache';
 
 const router = express.Router();
 
 router.post('/gdp-growth-quarterly', createGDPGrowthQuarterly);
 router.put('/gdp-growth-quarterly/:id', updateGDPGrowthQuarterly);
 router.delete('/gdp-growth-quarterly/:id', deleteGDPGrowthQuarterly);
-router.get('/gdp-growth-quarterly', apiKeyRateLimit, getAllGDPGrowthQuarterly);
+router.get('/gdp-growth-quarterly', getAllGDPGrowthQuarterly);
 router.get(
   '/gdp-growth-quarterly/latest',
-  apiKeyRateLimit,
   getLatestGDPGrowthQuarterly,
 );
 router.get(
   '/gdp-growth-quarterly/history',
-  apiKeyRateLimit,
   getGDPGrowthQuarterlyHistory,
 );
 
 router.post('/gdp-growth-annual', createGDPGrowthAnnual);
 router.put('/gdp-growth-annual/:id', updateGDPGrowthAnnual);
 router.delete('/gdp-growth-annual/:id', deleteGDPGrowthAnnual);
-router.get('/gdp-growth-annual', apiKeyRateLimit, getAllGDPGrowthAnnual);
+router.get('/gdp-growth-annual', getAllGDPGrowthAnnual);
 router.get(
   '/gdp-growth-annual/latest',
-  apiKeyRateLimit,
   getLatestGDPGrowthAnnual,
 );
 router.get(
   '/gdp-growth-annual/history',
-  apiKeyRateLimit,
   getGDPGrowthAnnualHistory,
 );
 
 router.post('/government-gdp-value', createGovernmentGDPValue);
 router.put('/government-gdp-value/:id', updateGovernmentGDPValue);
 router.delete('/government-gdp-value/:id', deleteGovernmentGDPValue);
-router.get('/government-gdp-value', apiKeyRateLimit, getAllGovernmentGDPValue);
+router.get('/government-gdp-value', getAllGovernmentGDPValue);
 router.get(
   '/government-gdp-value/latest',
-  apiKeyRateLimit,
   getLatestGovernmentGDPValue,
 );
 router.get(
   '/government-gdp-value/history',
-  apiKeyRateLimit,
   getGovernmentGDPValueHistory,
 );
 
 router.post('/interest-rate', createInterestRate);
 router.put('/interest-rate/:id', updateInterestRate);
 router.delete('/interest-rate/:id', deleteInterestRate);
-router.get('/interest-rate', apiKeyRateLimit, getAllInterestRate);
-router.get('/interest-rate/latest', apiKeyRateLimit, getLatestInterestRate);
-router.get('/interest-rate/history', apiKeyRateLimit, getInterestRateHistory);
+router.get('/interest-rate', getAllInterestRate);
+router.get('/interest-rate/latest', getLatestInterestRate);
+router.get('/interest-rate/history', getInterestRateHistory);
 
 router.post('/inflation-rate', createInflationRate);
 router.put('/inflation-rate/:id', updateInflationRate);
 router.delete('/inflation-rate/:id', deleteInflationRate);
-router.get('/inflation-rate', apiKeyRateLimit, getAllInflationRate);
-router.get('/inflation-rate/latest', apiKeyRateLimit, getLatestInflationRate);
-router.get('/inflation-rate/history', apiKeyRateLimit, getInflationRateHistory);
+router.get('/inflation-rate', getAllInflationRate);
+router.get('/inflation-rate/latest', getLatestInflationRate);
+router.get('/inflation-rate/history', getInflationRateHistory);
 
 router.post('/unemployment-rate', createUnemploymentRate);
 router.put('/unemployment-rate/:id', updateUnemploymentRate);
 router.delete('/unemployment-rate/:id', deleteUnemploymentRate);
-router.get('/unemployment-rate', apiKeyRateLimit, getAllUnemploymentRate);
+router.get('/unemployment-rate', getAllUnemploymentRate);
 router.get(
   '/unemployment-rate/latest',
-  apiKeyRateLimit,
   getLatestUnemploymentRate,
 );
 router.get(
   '/unemployment-rate/history',
-  apiKeyRateLimit,
   getUnemploymentRateHistory,
 );
 
 router.post('/balance-of-trade', createBalanceOfTrade);
 router.put('/balance-of-trade/:id', updateBalanceOfTrade);
 router.delete('/balance-of-trade/:id', deleteBalanceOfTrade);
-router.get('/balance-of-trade', apiKeyRateLimit, getAllBalanceOfTrade);
+router.get('/balance-of-trade', getAllBalanceOfTrade);
 router.get(
   '/balance-of-trade/latest',
-  apiKeyRateLimit,
   getLatestBalanceOfTrade,
 );
 router.get(
   '/balance-of-trade/history',
-  apiKeyRateLimit,
   getBalanceOfTradeHistory,
 );
 
@@ -180,17 +168,14 @@ router.put('/government-debt-to-gdp/:id', updateGovernmentDebtToGDP);
 router.delete('/government-debt-to-gdp/:id', deleteGovernmentDebtToGDP);
 router.get(
   '/government-debt-to-gdp',
-  apiKeyRateLimit,
   getAllGovernmentDebtToGDP,
 );
 router.get(
   '/government-debt-to-gdp/latest',
-  apiKeyRateLimit,
   getLatestGovernmentDebtToGDP,
 );
 router.get(
   '/government-debt-to-gdp/history',
-  apiKeyRateLimit,
   getGovernmentDebtToGDPHistory,
 );
 
@@ -199,17 +184,14 @@ router.put('/government-debt-value/:id', updateGovernmentDebtValue);
 router.delete('/government-debt-value/:id', deleteGovernmentDebtValue);
 router.get(
   '/government-debt-value',
-  apiKeyRateLimit,
   getAllGovernmentDebtValue,
 );
 router.get(
   '/government-debt-value/latest',
-  apiKeyRateLimit,
   getLatestGovernmentDebtValue,
 );
 router.get(
   '/government-debt-value/history',
-  apiKeyRateLimit,
   getGovernmentDebtValueHistory,
 );
 
@@ -218,62 +200,53 @@ router.put('/government-budget-value/:id', updateGovernmentBudgetValue);
 router.delete('/government-budget-value/:id', deleteGovernmentBudgetValue);
 router.get(
   '/government-budget-value',
-  apiKeyRateLimit,
   getAllGovernmentBudgetValue,
 );
 router.get(
   '/government-budget-value/latest',
-  apiKeyRateLimit,
   getLatestGovernmentBudgetValue,
 );
 router.get(
   '/government-budget-value/history',
-  apiKeyRateLimit,
   getGovernmentBudgetValueHistory,
 );
 
 router.post('/government-revenues', createGovernmentRevenues);
 router.put('/government-revenues/:id', updateGovernmentRevenues);
 router.delete('/government-revenues/:id', deleteGovernmentRevenues);
-router.get('/government-revenues', apiKeyRateLimit, getAllGovernmentRevenues);
+router.get('/government-revenues', getAllGovernmentRevenues);
 router.get(
   '/government-revenues/latest',
-  apiKeyRateLimit,
   getLatestGovernmentRevenues,
 );
 router.get(
   '/government-revenues/history',
-  apiKeyRateLimit,
   getGovernmentRevenuesHistory,
 );
 
 router.post('/fiscal-expenditure', createFiscalExpenditure);
 router.put('/fiscal-expenditure/:id', updateFiscalExpenditure);
 router.delete('/fiscal-expenditure/:id', deleteFiscalExpenditure);
-router.get('/fiscal-expenditure', apiKeyRateLimit, getAllFiscalExpenditure);
+router.get('/fiscal-expenditure', getAllFiscalExpenditure);
 router.get(
   '/fiscal-expenditure/latest',
-  apiKeyRateLimit,
   getLatestFiscalExpenditure,
 );
 router.get(
   '/fiscal-expenditure/history',
-  apiKeyRateLimit,
   getFiscalExpenditureHistory,
 );
 
 router.post('/government-spending', createGovernmentSpending);
 router.put('/government-spending/:id', updateGovernmentSpending);
 router.delete('/government-spending/:id', deleteGovernmentSpending);
-router.get('/government-spending', apiKeyRateLimit, getAllGovernmentSpending);
+router.get('/government-spending', getAllGovernmentSpending);
 router.get(
   '/government-spending/latest',
-  apiKeyRateLimit,
   getLatestGovernmentSpending,
 );
 router.get(
   '/government-spending/history',
-  apiKeyRateLimit,
   getGovernmentSpendingHistory,
 );
 

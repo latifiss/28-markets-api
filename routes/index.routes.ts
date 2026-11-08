@@ -9,25 +9,16 @@ import {
   addIndexHistory,
   updateIndexPrice,
 } from '../controllers/index.controller';
-import { unifiedAuth } from '../middleware/unifiedAuth';
-import { rateLimiter } from '../middleware/rateLimiter';
 
 const router = express.Router();
 
-router.post('/indices', createIndex);
-router.put('/indices/:code', updateIndex);
-router.delete('/indices/:code', deleteIndex);
-router.post('/indices/:code/price', updateIndexPrice);
-router.post('/indices/:code/history', addIndexHistory);
-
-router.get('/indices', getAllIndices);
-router.get('/indices/:code', getIndexByCode);
-router.get('/indices/:code/history', getIndexHistory);
-
-router.get('/', unifiedAuth, rateLimiter, getAllIndices);
-router.get('/:code', unifiedAuth, rateLimiter, getIndexByCode);
-router.get('/:code/history', unifiedAuth, rateLimiter, getIndexHistory);
-
+router.get('/', getAllIndices);
+router.post('/', createIndex);
+router.get('/:code', getIndexByCode);
+router.put('/:code', updateIndex);
+router.delete('/:code', deleteIndex);
+router.post('/:code/price', updateIndexPrice);
+router.get('/:code/history', getIndexHistory);
 router.post('/:code/history', addIndexHistory);
 
 export default router;

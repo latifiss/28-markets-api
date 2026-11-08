@@ -1,14 +1,17 @@
 {
-  "name": "savanna-stack",
+  "name": "28-markets-api",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "ts-node-dev --respawn --transpile-only index.ts",
-    "dev": "ts-node-dev --transpile-only index.ts",
+    "start": "node dist/index.js",
+    "dev": "npm run start:dev",
     "build": "tsc",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "start:dev": "ts-node-dev --respawn --transpile-only index.ts",
+    "worker:usage": "node dist/workers/usage.worker.js",
+    "migrate:remove-legacy-plan-fields": "ts-node scripts/remove-legacy-plan-fields.ts"
   },
   "keywords": [],
   "author": "",
@@ -22,7 +25,6 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^25.3.5",
-    "@types/stripe": "^8.0.416",
     "@types/supertest": "^7.2.0",
     "@types/ws": "^8.18.1",
     "jest": "^30.3.0",
@@ -39,17 +41,13 @@
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "cron": "^4.4.0",
-    "crypto": "^1.0.1",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.3.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.4",
     "morgan": "^1.10.1",
-    "rate-limit-redis": "^4.3.1",
     "redis": "^5.11.0",
     "serve-favicon": "^2.5.1",
-    "stripe": "^22.0.2",
     "ws": "^8.18.3"
   }
 }

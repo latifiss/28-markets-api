@@ -1,14 +1,23 @@
 import request from 'supertest';
+jest.mock('../../middleware/protectMutations', () => ({
+  protectMutations: (_req: any, _res: any, next: any) => next(),
+}));
+jest.mock('../../lib/redis', () => ({
+  getRedisClient: async () => ({
+    eval: async (_script: string, options: { keys: string[] }) =>
+      options.keys[0].includes(':auth-rl:') ? [1, 9, 0] : [1, 500, 0],
+    get: async () => null,
+    set: async () => 'OK',
+    del: async () => 1,
+    rPush: async () => 1,
+  }),
+}));
+
 import { createApp } from '../../app';
 import ForexInterbank from '../../models/forexInterbank.model';
 
-jest.mock('../../lib/redis', () => ({
-  getRedisClient: async () => null,
-}));
-
 describe('Forex interbank routes', () => {
-  it('updates interbank prices and returns 200', async () => {
-    const app = createApp();
+  it('updates interbank prices through the canonical path', async () => {
     const pair = await ForexInterbank.create({
       bankName: 'Test Bank',
       bankCode: 'TB',
@@ -27,8 +36,8 @@ describe('Forex interbank routes', () => {
       last_updated: new Date(),
     });
 
-    const res = await request(app)
-      .put(`/api/forex-interbank-rates/interbank-pairs/${pair._id}/prices`)
+    const response = await request(createApp())
+      .put(`/api/v1/forex/interbank-pairs/${pair._id}/prices`)
       .send({
         current_buying_price: 10.1,
         current_selling_price: 11.1,
@@ -36,9 +45,8 @@ describe('Forex interbank routes', () => {
       })
       .expect(200);
 
-    expect(res.body?.success).toBe(true);
-    expect(res.body?.data?.bankCode).toBe('TB');
-    expect(res.body?.data?.current_midrate_price).toBe(10.6);
+    expect(response.body?.success).toBe(true);
+    expect(response.body?.data?.bankCode).toBe('TB');
+    expect(response.body?.data?.current_midrate_price).toBe(10.6);
   });
 });
-

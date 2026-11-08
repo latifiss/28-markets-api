@@ -1,16 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export type PlanTier = 'free' | 'pro' | 'business';
-
 export interface IUser extends Document {
   email: string;
   password: string;
   name: string;
   isActive: boolean;
-  tier: PlanTier;
-  stripeCustomerId?: string;
-  subscriptionStatus?: 'active' | 'past_due' | 'canceled' | 'incomplete';
-  currentPeriodEnd?: Date;
+  role: 'user' | 'admin';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,43 +17,33 @@ const userSchema: Schema = new Schema(
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
+      index: true,
     },
     password: {
       type: String,
       required: true,
+      select: false,
     },
     name: {
       type: String,
       required: true,
+      trim: true,
+      maxlength: 120,
     },
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
-    tier: {
+    role: {
       type: String,
-      enum: ['free', 'pro', 'business'],
-      default: 'free',
-    },
-    stripeCustomerId: {
-      type: String,
-      required: false,
-      unique: false,
-      sparse: true,
-    },
-    subscriptionStatus: {
-      type: String,
-      enum: ['active', 'past_due', 'canceled', 'incomplete'],
-      default: 'active',
-    },
-    currentPeriodEnd: {
-      type: Date,
-      required: false,
+      enum: ['user', 'admin'],
+      default: 'user',
+      index: true,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true },
 );
 
 export default mongoose.model<IUser>('User', userSchema);

@@ -3,41 +3,57 @@ import mongoose from 'mongoose';
 let isDBConnected = false;
 const connectionCallbacks: (() => void)[] = [];
 
-export const connectDB = async () => {
-  try {
-    console.log('🔌 Attempting MongoDB connection...');
-    await mongoose.connect(process.env.MONGODB_URI!, {
-      dbName: 'api',
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 45000,
-      maxPoolSize: 10,
-      retryWrites: true,
-      retryReads: true,
-    });
-
+export const connectDB = async (): Promise<typeof mongoose> => {
+  if (mongoose.connection.readyState === 1) {
     isDBConnected = true;
-    console.log('✅ MongoDB connected successfully!');
-
-    connectionCallbacks.forEach((cb) => cb());
-    connectionCallbacks.length = 0;
-  } catch (err: any) {
-    console.error('❌ MongoDB connection failed:', err.message);
-    console.log('🔄 Retrying in 5 seconds...');
-    setTimeout(connectDB, 5000);
+    return mongoose;
   }
+
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error('MONGODB_URI is required');
+  }
+
+  const configuredPoolSize = Number(process.env.MONGODB_MAX_POOL_SIZE || 10);
+  const maxPoolSize =
+    Number.isInteger(configuredPoolSize) && configuredPoolSize > 0
+      ? configuredPoolSize
+      : 10;
+
+  console.info('Connecting to MongoDB...');
+  await mongoose.connect(uri, {
+    dbName: process.env.MONGODB_DATABASE || 'api',
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    maxPoolSize,
+    minPoolSize: 0,
+    retryWrites: true,
+    retryReads: true,
+  });
+
+  isDBConnected = true;
+  console.info('MongoDB connected');
+
+  connectionCallbacks.splice(0).forEach((callback) => callback());
+  return mongoose;
 };
 
 mongoose.connection.on('disconnected', () => {
   isDBConnected = false;
-  console.log('💔 Disconnected from MongoDB');
+  console.warn('MongoDB disconnected');
+});
+
+mongoose.connection.on('error', (error) => {
+  isDBConnected = false;
+  console.error('MongoDB connection error:', error);
 });
 
 export const onConnected = (callback: () => void) => {
-  if (isDBConnected) {
+  if (isDBConnected || mongoose.connection.readyState === 1) {
     callback();
-  } else {
-    connectionCallbacks.push(callback);
+    return;
   }
+  connectionCallbacks.push(callback);
 };
 
 export { mongoose };
