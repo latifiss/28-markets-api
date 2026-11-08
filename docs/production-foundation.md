@@ -77,6 +77,21 @@ Defaults are configurable through `API_RATE_LIMIT_MAX`, `API_WRITE_RATE_LIMIT_MA
 The new canonical route namespace is `/api/v1`. Old unversioned routes are not mounted by the new application router. Update consumers to the paths in `README.md` and `docs/api-v1.md` before deploying. Account usage remains analytics-only and does not gate access.
 
 
+## 50-million-requests/day capacity validation
+
+50,000,000 requests/day averages approximately 579 requests/second. The authenticated k6 scenario in `load-tests/public-api.js` defaults to 600 sustained requests/second for 30 minutes, followed by a 1,000-to-2,000 requests/second burst. Run it against a production-like deployment with a dedicated least-privilege test key:
+
+```bash
+BASE_URL=https://your-service.onrender.com \
+API_KEY=<dedicated-load-test-api-key> \
+TARGET_RPS=580 DURATION=24h \
+k6 run load-tests/public-api.js
+```
+
+The default API limits (600 requests/minute per account and 1,200/minute per IP) are intentionally conservative and will throttle a single account/IP far below this target. Before a capacity test, set `API_RATE_LIMIT_MAX` and `API_IP_RATE_LIMIT_MAX` to values that match the planned traffic distribution; set `API_WRITE_RATE_LIMIT_MAX` separately if the workload includes substantial ingestion. Do not simply remove limits. Test with the real number of API instances, realistic MongoDB/Redis tiers, cache hit/miss ratios, cold-cache bursts, and dependency failures. Record achieved throughput, p50/p95/p99 latency, error/429/503 rates, CPU/memory, database pool saturation, Redis operations and cost.
+
+A successful 30-minute test is not proof of 24-hour capacity. Do not claim 50-million/day readiness until a sustained 24-hour run and burst/failure tests pass on the intended production topology. Render Starter sizing and default Redis quotas must not be assumed sufficient.
+
 ## Legacy account-field cleanup
 
 The application schema no longer reads paid-plan or payment-provider fields. After taking a database backup, run `npm run migrate:remove-legacy-plan-fields` once to unset `tier`, `stripeCustomerId`, `subscriptionStatus` and `currentPeriodEnd` from user documents. The script does not delete historical subscription records; retain or archive those according to your data-retention requirements.
