@@ -40,9 +40,9 @@ Infrastructure and rate-limit errors use stable machine-readable codes. Rate lim
 
 | Variable | Default | Scope |
 |---|---:|---|
-| `API_RATE_LIMIT_MAX` | 600 | requests/minute per authenticated identity for reads |
-| `API_WRITE_RATE_LIMIT_MAX` | 60 | requests/minute per authenticated identity for writes |
+| `API_RATE_LIMIT_MAX` | 600 | requests/minute per account for reads |
+| `API_WRITE_RATE_LIMIT_MAX` | 60 | requests/minute per account for writes |
 | `API_IP_RATE_LIMIT_MAX` | 1200 | requests/minute per source IP, before authentication |
 | `AUTH_RATE_LIMIT_MAX` | 10 | login/registration attempts per 15-minute window |
 
-Token buckets are atomic Lua scripts in shared Redis. The same rate-limit policy applies to every API consumer.
+Token buckets are atomic Lua scripts in shared Redis. Authenticated API keys and JWTs share one account bucket, preventing additional keys from multiplying an account's allowance. Anonymous callers are limited by source IP.

@@ -128,10 +128,10 @@ export async function apiRateLimit(
     if (!redis) return unavailable(res);
 
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const identity = req.apiKeyId
-      ? `key:${req.apiKeyId}`
-      : req.user?.userId
-        ? `user:${req.user.userId}`
+    const identity = req.user?.userId
+      ? `user:${req.user.userId}`
+      : req.apiKeyId
+        ? `key:${req.apiKeyId}`
         : `anonymous:${ip}`;
     const writeRequest =
       !['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase()) &&

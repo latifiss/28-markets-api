@@ -6,7 +6,7 @@ A versioned financial-market data API for currencies, equities, indices, commodi
 
 `https://<your-render-service>.onrender.com/api/v1`
 
-All market-data reads are public. An API key is optional for attribution and per-key rate limiting:
+All market-data reads are public. An API key is optional for attribution and authenticated account-level rate limiting:
 
 ```http
 X-API-Key: <your-api-key>
