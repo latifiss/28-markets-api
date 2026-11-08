@@ -70,6 +70,10 @@ Rate-limited responses use HTTP 429 with `Retry-After`, `RateLimit-Limit`, `Rate
 - Authenticated responses bypass the shared public response cache; the API no longer serves anonymous market-data reads.
 - Mutations are protected centrally before they reach route handlers.
 
+## Load testing
+
+An authenticated k6 scenario is provided at `load-tests/public-api.js`. It tests sustained throughput and a burst. See `docs/production-foundation.md` for the 50-million-requests/day test procedure and rate-limit configuration. Passing the script is a prerequisite for capacity claims, not a guarantee of production capacity.
+
 ## Compatibility
 
 The versioned `/api/v1` namespace is the canonical interface. The old unversioned `/api/*` routes are intentionally not mounted in this versioned router. Update clients to the paths above before deploying this branch.
