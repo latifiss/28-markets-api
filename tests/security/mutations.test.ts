@@ -72,7 +72,7 @@ describe('market data mutation security', () => {
   ])('requires credentials for %s %s, including unknown routes', async (method, path) => {
     const response = await (request(createApp()) as any)[method](path);
     expect(response.status).toBe(401);
-    expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+    if (method !== 'head') expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
   it('allows CORS preflight without API credentials', async () => {
