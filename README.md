@@ -44,7 +44,7 @@ The route modules also expose history, statistics, dividends, earnings, financia
 
 - Public GET/HEAD requests do not require credentials.
 - API keys and bearer JWTs are optional on public reads.
-- All market-data mutations (POST/PUT/PATCH/DELETE) require an authenticated administrator.
+- All operations that change stored market data require an authenticated administrator. Read-only POST operations for bulk queries/exports and treasury calculations remain public but rate-limited.
 - Administrator access is granted by the account `role: admin` or the `MARKET_DATA_ADMIN_USER_IDS` allowlist.
 - Account and API-key management endpoints require a bearer JWT.
 

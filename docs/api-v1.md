@@ -3,7 +3,8 @@
 The canonical prefix is `/api/v1`. Route methods are classified centrally:
 
 - `GET`, `HEAD`, `OPTIONS`: public market-data reads.
-- `POST`, `PUT`, `PATCH`, `DELETE`: administrator-only market-data operations.
+- Mutating `POST`, `PUT`, `PATCH`, and `DELETE` routes: administrator-only.
+- Explicitly read-only POST routes (Forex bulk query/export and treasury return calculation): public and rate-limited.
 - `/auth/*`: account authentication and API-key management.
 - `/account/usage`: authenticated usage analytics.
 
