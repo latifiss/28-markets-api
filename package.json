@@ -9,7 +9,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "start:dev": "ts-node-dev --respawn --transpile-only index.ts",
+    "start:dev": "ts-node-dev --prefer-ts-exts --respawn --transpile-only index.ts",
     "worker:usage": "node dist/workers/usage.worker.js",
     "migrate:remove-legacy-plan-fields": "ts-node scripts/remove-legacy-plan-fields.ts"
   },
