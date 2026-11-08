@@ -1,77 +1,219 @@
-import type { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
+import type { NextFunction, Response } from 'express';
+import type { AuthRequest } from './auth';
 import { getRedisClient } from '../lib/redis';
+import { trackApiUsage } from '../service/usageTracker';
 
-type LimitOptions = {
-  prefix: string;
-  windowMs: number;
-  max: number;
-  message: string;
-};
+const WINDOW_MS = 60_000;
+const TOKEN_BUCKET_SCRIPT = `
+local values = redis.call('HMGET', KEYS[1], 'tokens', 'updatedAt')
+local capacity = tonumber(ARGV[1])
+local refill_per_ms = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
+local ttl = tonumber(ARGV[4])
+local tokens = tonumber(values[1]) or capacity
+local updated_at = tonumber(values[2]) or now
+local elapsed = math.max(0, now - updated_at)
+tokens = math.min(capacity, tokens + elapsed * refill_per_ms)
+local allowed = 0
+if tokens >= 1 then
+  tokens = tokens - 1
+  allowed = 1
+end
+redis.call('HSET', KEYS[1], 'tokens', tokens, 'updatedAt', now)
+redis.call('PEXPIRE', KEYS[1], ttl)
+local retry_ms = 0
+if allowed == 0 then
+  retry_ms = math.ceil((1 - tokens) / refill_per_ms)
+end
+return { allowed, math.floor(tokens), retry_ms }
+`;
 
-const SCRIPT = `
+const FIXED_WINDOW_SCRIPT = `
 local count = redis.call('INCR', KEYS[1])
 if count == 1 then redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[1])) end
 local ttl = redis.call('PTTL', KEYS[1])
 return { count, ttl }
 `;
 
-const createRedisRateLimit = (options: LimitOptions) =>
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const redis = await getRedisClient();
-      if (!redis) {
-        return res.status(503).json({
-          error: 'Rate limiting is temporarily unavailable. Please retry shortly.',
-        });
-      }
+const positiveInt = (name: string, fallback: number): number => {
+  const value = Number(process.env[name]);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+};
 
-      const identity = req.ip || req.socket.remoteAddress || 'unknown';
-      const bucket = Math.floor(Date.now() / options.windowMs);
-      const key = `28m:ratelimit:v1:${options.prefix}:${bucket}:${identity}`;
-      const result = await redis.eval(SCRIPT, {
-        keys: [key],
-        arguments: [String(options.windowMs)],
-      }) as number[];
+const digest = (value: string) =>
+  crypto.createHash('sha256').update(value).digest('hex');
 
-      const count = Number(result?.[0] || 0);
-      const ttl = Math.max(0, Number(result?.[1] || options.windowMs));
-      const remaining = Math.max(0, options.max - count);
+async function consumeBucket(
+  redis: NonNullable<Awaited<ReturnType<typeof getRedisClient>>>,
+  key: string,
+  capacity: number,
+): Promise<{ allowed: boolean; remaining: number; retryAfter: number }> {
+  const now = Date.now();
+  const ttl = WINDOW_MS * 2;
+  const result = (await redis.eval(TOKEN_BUCKET_SCRIPT, {
+    keys: [key],
+    arguments: [
+      String(capacity),
+      String(capacity / WINDOW_MS),
+      String(now),
+      String(ttl),
+    ],
+  })) as number[];
 
-      res.setHeader('RateLimit-Limit', String(options.max));
-      res.setHeader('RateLimit-Remaining', String(remaining));
-      res.setHeader('RateLimit-Reset', String(Math.ceil((Date.now() + ttl) / 1000)));
+  const allowed = Number(result?.[0]) === 1;
+  const remaining = Math.max(0, Number(result?.[1] || 0));
+  const retryAfter = Math.max(1, Math.ceil(Number(result?.[2] || 1) / 1000));
+  return { allowed, remaining, retryAfter };
+}
 
-      if (count > options.max) {
-        res.setHeader('Retry-After', String(Math.ceil(ttl / 1000)));
-        return res.status(429).json({ error: options.message });
-      }
+function unavailable(res: Response) {
+  return res.status(503).json({
+    error: 'Rate limiting is temporarily unavailable',
+    code: 'RATE_LIMITER_UNAVAILABLE',
+  });
+}
 
-      return next();
-    } catch (error) {
-      console.error('Redis rate limiter failed:', error);
-      return res.status(503).json({
-        error: 'Rate limiting is temporarily unavailable. Please retry shortly.',
+/** Coarse IP guard runs before API-key authentication to protect invalid-key attempts. */
+export async function apiIpRateLimit(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const redis = await getRedisClient();
+    if (!redis) return unavailable(res);
+
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const limit = positiveInt('API_IP_RATE_LIMIT_MAX', 1200);
+    const result = await consumeBucket(
+      redis,
+      `28m:api-rl:v2:ip:${digest(ip)}`,
+      limit,
+    );
+
+    res.setHeader('RateLimit-Policy', `${limit};w=60`);
+    res.setHeader('RateLimit-Limit', String(limit));
+    res.setHeader('RateLimit-Remaining', String(result.remaining));
+
+    if (!result.allowed) {
+      res.setHeader('Retry-After', String(result.retryAfter));
+      return res.status(429).json({
+        type: 'about:blank',
+        title: 'Too Many Requests',
+        status: 429,
+        detail: 'The request rate limit for this IP address has been exceeded.',
+        code: 'IP_RATE_LIMIT_EXCEEDED',
+        retryAfter: result.retryAfter,
       });
     }
-  };
 
-export const generalRateLimit = createRedisRateLimit({
-  prefix: 'general',
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP, please try again later.',
-});
+    return next();
+  } catch (error) {
+    console.error('IP rate limiter failed:', error);
+    return unavailable(res);
+  }
+}
 
-export const authRateLimit = createRedisRateLimit({
-  prefix: 'auth',
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: 'Too many authentication attempts, please try again later.',
-});
+/** Identity guard runs after optional JWT/API-key authentication. */
+export async function apiRateLimit(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const redis = await getRedisClient();
+    if (!redis) return unavailable(res);
 
-export const apiKeyRateLimit = createRedisRateLimit({
-  prefix: 'api-key',
-  windowMs: 60 * 60 * 1000,
-  max: 50,
-  message: 'API rate limit exceeded, please try again in an hour.',
-});
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const identity = req.apiKeyId
+      ? `key:${req.apiKeyId}`
+      : req.user?.userId
+        ? `user:${req.user.userId}`
+        : `anonymous:${ip}`;
+    const writeRequest = !['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase());
+    const limit = writeRequest
+      ? positiveInt('API_WRITE_RATE_LIMIT_MAX', 60)
+      : positiveInt('API_RATE_LIMIT_MAX', 600);
+    const result = await consumeBucket(
+      redis,
+      `28m:api-rl:v2:identity:${digest(identity)}`,
+      limit,
+    );
+
+    res.setHeader('RateLimit-Policy', `${limit};w=60`);
+    res.setHeader('RateLimit-Limit', String(limit));
+    res.setHeader('RateLimit-Remaining', String(result.remaining));
+
+    if (!result.allowed) {
+      res.setHeader('Retry-After', String(result.retryAfter));
+      return res.status(429).json({
+        type: 'about:blank',
+        title: 'Too Many Requests',
+        status: 429,
+        detail: 'The request rate limit has been exceeded. Retry after the indicated delay.',
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter: result.retryAfter,
+      });
+    }
+
+    const userId = req.user?.userId;
+    if (userId) {
+      res.once('finish', () => {
+        const route = req.route?.path
+          ? `${req.baseUrl}${req.route.path}`
+          : req.path;
+        void trackApiUsage(userId, route, req.method).catch((error) => {
+          console.error('Unable to queue API usage event:', error);
+        });
+      });
+    }
+
+    return next();
+  } catch (error) {
+    console.error('Redis API rate limiter failed:', error);
+    return unavailable(res);
+  }
+}
+
+export async function authRateLimit(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const redis = await getRedisClient();
+    if (!redis) return unavailable(res);
+
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const bucket = Math.floor(Date.now() / (15 * 60 * 1000));
+    const key = `28m:auth-rl:v1:${digest(ip)}:${bucket}`;
+    const result = (await redis.eval(FIXED_WINDOW_SCRIPT, {
+      keys: [key],
+      arguments: [String(15 * 60 * 1000)],
+    })) as number[];
+
+    const count = Number(result?.[0] || 0);
+    const ttl = Math.max(1, Number(result?.[1] || 1));
+    const limit = positiveInt('AUTH_RATE_LIMIT_MAX', 10);
+    res.setHeader('RateLimit-Limit', String(limit));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, limit - count)));
+
+    if (count > limit) {
+      const retryAfter = Math.ceil(ttl / 1000);
+      res.setHeader('Retry-After', String(retryAfter));
+      return res.status(429).json({
+        type: 'about:blank',
+        title: 'Too Many Requests',
+        status: 429,
+        detail: 'Too many authentication attempts. Try again later.',
+        code: 'AUTH_RATE_LIMIT_EXCEEDED',
+        retryAfter,
+      });
+    }
+    return next();
+  } catch (error) {
+    console.error('Authentication rate limiter failed:', error);
+    return unavailable(res);
+  }
+}

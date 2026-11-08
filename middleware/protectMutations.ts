@@ -1,6 +1,5 @@
 import type { NextFunction, Response } from 'express';
 import type { AuthRequest } from './auth';
-import { rateLimiter } from './rateLimiter';
 import { unifiedAuth } from './unifiedAuth';
 
 const adminUserIds = new Set(
@@ -27,12 +26,11 @@ export function protectMutations(
     if (!isAdministrator) {
       return res.status(403).json({
         error: 'Administrator privileges are required for market-data mutations',
+        code: 'ADMIN_REQUIRED',
       });
     }
 
-    return rateLimiter(req, res, () => {
-      req.mutationGuardPassed = true;
-      return next();
-    });
+    req.mutationGuardPassed = true;
+    return next();
   });
 }

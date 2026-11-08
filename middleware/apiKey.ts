@@ -14,7 +14,6 @@ type CachedApiKey = {
   keyId: string;
   userId: string;
   email: string;
-  tier: 'free' | 'pro' | 'business';
   role: 'user' | 'admin';
   isActive: boolean;
 };
@@ -32,23 +31,19 @@ export const generateApiKey = async (
   return key;
 };
 
-export const revokeApiKey = async (key: string): Promise<boolean> => {
-  const hash = hashApiKey(key);
-  let result = await ApiKey.findOneAndUpdate(
-    { keyHash: hash, revoked: false },
-    { revoked: true },
-  );
+export const revokeApiKeyById = async (
+  userId: string,
+  keyId: string,
+): Promise<boolean> => {
+  const record = await ApiKey.findOneAndUpdate(
+    { _id: keyId, userId, revoked: false },
+    { $set: { revoked: true } },
+    { new: true },
+  ).select('+keyHash');
 
-  // Support revoking keys that have not yet completed lazy migration.
-  if (!result) {
-    result = await ApiKey.findOneAndUpdate(
-      { key, revoked: false },
-      { revoked: true },
-    );
-  }
-
-  await deleteCache(cacheKey(hash));
-  return Boolean(result);
+  if (!record) return false;
+  if (record.keyHash) await deleteCache(cacheKey(record.keyHash));
+  return true;
 };
 
 export const authenticateApiKey = async (
@@ -86,32 +81,28 @@ export const authenticateApiKey = async (
         }
       }
 
-      if (!record) {
-        return res.status(403).json({ error: 'Invalid API key' });
-      }
+      if (!record) return res.status(401).json({ error: 'Invalid API key' });
 
       const user = await User.findById(record.userId)
-        .select('email tier role isActive')
+        .select('email role isActive')
         .lean();
 
       if (!user || !user.isActive) {
-        return res.status(403).json({ error: 'User is not active' });
+        return res.status(401).json({ error: 'API key owner is inactive' });
       }
 
       metadata = {
         keyId: String(record._id),
         userId: String(record.userId),
         email: user.email,
-        tier: user.tier,
         role: user.role || 'user',
         isActive: user.isActive,
       };
-
       await setCache(cacheKey(hash), metadata, 30);
     }
 
     if (!metadata.isActive) {
-      return res.status(403).json({ error: 'User is not active' });
+      return res.status(401).json({ error: 'API key owner is inactive' });
     }
 
     req.apiKey = `key:${metadata.keyId}`;
@@ -119,11 +110,8 @@ export const authenticateApiKey = async (
     req.user = {
       userId: metadata.userId,
       email: metadata.email,
-      tier: metadata.tier,
       role: metadata.role,
     };
-    req.tier = metadata.tier;
-
     return next();
   } catch (error) {
     console.error('API key authentication failed:', error);

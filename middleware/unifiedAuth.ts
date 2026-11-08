@@ -8,18 +8,14 @@ export const unifiedAuth = (
   res: Response,
   next: NextFunction,
 ) => {
-  // The global mutation guard has already authenticated and admitted this request.
   if (req.mutationGuardPassed && req.user) return next();
+  if (req.user) return next();
 
-  if (req.headers['x-api-key']) {
-    return authenticateApiKey(req, res, next);
-  }
-
-  if (req.headers.authorization) {
-    return authenticateToken(req, res, next);
-  }
+  if (req.headers['x-api-key']) return authenticateApiKey(req, res, next);
+  if (req.headers.authorization) return authenticateToken(req, res, next);
 
   return res.status(401).json({
-    error: 'Authentication required. Provide JWT token or API key',
+    error: 'Authentication required. Provide a bearer token or x-api-key.',
+    code: 'AUTHENTICATION_REQUIRED',
   });
 };

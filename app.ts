@@ -3,20 +3,10 @@ import cors from 'cors';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
 
-import authRouter from './routes/auth';
-import usageRouter from './routes/usage';
-import cryptoRoutes from './routes/crypto.routes';
-import indexRoutes from './routes/index.routes';
-import forexRoutes from './routes/forex.routes';
-import forexInterbankRoutes from './routes/forexInterbank.routes';
-import commodityRoutes from './routes/commodity.routes';
-import goldbodRoutes from './routes/goldbod.routes';
-import economicRoutes from './routes/economic.routes';
-import treasuryRoutes from './routes/treasury.routes';
-import stockRoutes from './routes/stocks.routes';
-import eventRoutes from './routes/event.routes';
-import billingRouter from './routes/billing';
+import v1Routes from './routes/v1';
 import { protectMutations } from './middleware/protectMutations';
+import { optionalApiIdentity } from './middleware/optionalApiIdentity';
+import { apiIpRateLimit, apiRateLimit } from './middleware/rateLimit';
 import { publicResponseCache } from './middleware/publicResponseCache';
 
 const defaultAllowedOrigins = [
@@ -40,25 +30,18 @@ export const allowedOrigins = Array.from(
 
 export function createApp() {
   const app = express();
-
-  // Render terminates TLS and forwards requests through one trusted proxy.
+  app.disable('x-powered-by');
   app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 1));
 
-  app.use(
-    cors({
-      origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
-          return callback(null, true);
-        }
-        return callback(new Error('Origin is not allowed by CORS'));
-      },
-      credentials: true,
-      maxAge: 86400,
-    }),
-  );
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('Origin is not allowed by CORS'));
+    },
+    credentials: true,
+    maxAge: 86400,
+  }));
 
-  // Webhook signatures must be checked against the unparsed request body.
-  app.use('/api/billing/webhook', express.raw({ type: 'application/json', limit: '1mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
@@ -75,31 +58,35 @@ export function createApp() {
     });
   });
 
-  app.use('/api', publicResponseCache);
+  // IP guard runs before credentials are parsed; identity limits run after optional auth.
+  app.use('/api/v1', apiIpRateLimit, optionalApiIdentity, apiRateLimit, publicResponseCache);
 
-  for (const prefix of ['/api/crypto', '/api/index', '/api/forex', '/api/forex-interbank-rates', '/api/commodity', '/api/goldbod', '/api/economy', '/api/treasury', '/api/stocks', '/api/event']) {
+  const mutationPrefixes = [
+    '/api/v1/crypto',
+    '/api/v1/indices',
+    '/api/v1/forex',
+    '/api/v1/commodities',
+    '/api/v1/gold',
+    '/api/v1/economic-indicators',
+    '/api/v1/treasury',
+    '/api/v1/equities',
+    '/api/v1/events',
+  ];
+  for (const prefix of mutationPrefixes) {
     app.use(prefix, protectMutations);
   }
 
-  app.use('/api/auth', authRouter);
-  app.use('/api/usage', usageRouter);
-  app.use('/api/crypto', cryptoRoutes);
-  app.use('/api/index', indexRoutes);
-  app.use('/api/forex', forexRoutes);
-  app.use('/api/forex-interbank-rates', forexInterbankRoutes);
-  app.use('/api/commodity', commodityRoutes);
-  app.use('/api/goldbod', goldbodRoutes);
-  app.use('/api/economy', economicRoutes);
-  app.use('/api/treasury', treasuryRoutes);
-  app.use('/api/stocks', stockRoutes);
-  app.use('/api/event', eventRoutes);
-  app.use('/api/billing', billingRouter);
+  app.use('/api/v1', v1Routes);
 
   app.get('/', (_req, res) => {
-    res.json({ name: '28 Markets API', status: 'operational' });
+    res.json({
+      name: '28 Markets API',
+      status: 'operational',
+      apiVersion: 'v1',
+      apiBasePath: '/api/v1',
+    });
   });
 
-  // Keep error responses predictable and avoid leaking internal exception details.
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) return next(err);
 
@@ -108,9 +95,7 @@ export function createApp() {
       err instanceof SyntaxError && 'body' in err ? 400 :
       err?.message === 'Origin is not allowed by CORS' ? 403 : 500;
 
-    if (status === 500) {
-      console.error('Unhandled request error:', err);
-    }
+    if (status === 500) console.error('Unhandled request error:', err);
 
     return res.status(status).json({
       error:
