@@ -33,7 +33,7 @@ Redis is required for API request admission and is included in readiness checks.
 
 ## Cache and scaling direction
 
-1. Cloudflare should cache only public GET responses whose output is independent of user identity and authorization.
+1. Cloudflare may cache only explicitly configured health-independent public assets. Authenticated API responses must bypass shared CDN caching unless a carefully reviewed authorization-aware cache design is implemented.
 2. Render API instances remain stateless. Do not use process-local state for distributed rate limits, locks, usage enforcement or cross-instance events.
 3. Upstash Redis is the shared L2 cache and coordination layer; an in-process cache is only an optional short-lived L1.
 4. MongoDB remains authoritative. A cache hit must not issue a MongoDB read.
@@ -59,7 +59,7 @@ New API keys are stored as SHA-256 hashes. Existing plaintext keys are migrated 
 
 ## Cache namespaces
 
-Controllers use the shared cache module. Keys are namespaced and versioned; invalidation increments a namespace version rather than scanning Redis keys. L1 entries expire after one second to bound cross-instance staleness. Default TTLs are selected by data domain and can be overridden per call. The generic public response cache bypasses authenticated, cookie-bearing and account-management requests.
+Controllers use the shared cache module. Keys are namespaced and versioned; invalidation increments a namespace version rather than scanning Redis keys. L1 entries expire after one second to bound cross-instance staleness. Default TTLs are selected by data domain and can be overridden per call. The generic public response cache bypasses all authenticated API requests; all `/api/v1` data access requires credentials.
 
 
 ## Public API operating model
@@ -68,7 +68,7 @@ The canonical interface is versioned under `/api/v1`. Every API route requires a
 
 ## Distributed rate limiting
 
-A Redis token bucket is applied twice: an IP ingress guard before credential parsing, then an identity bucket after optional JWT/API-key authentication. This protects invalid API-key attempts while allowing authenticated callers to receive per-key limits. Writes have a lower default capacity than reads. Redis admission failure is fail-closed with HTTP 503.
+A Redis token bucket is applied twice: an IP ingress guard before credential parsing, then an identity bucket after required JWT/API-key authentication. This protects invalid API-key attempts while allowing authenticated callers to receive per-account limits. Writes have a lower default capacity than reads. Redis admission failure is fail-closed with HTTP 503.
 
 Defaults are configurable through `API_RATE_LIMIT_MAX`, `API_WRITE_RATE_LIMIT_MAX`, `API_IP_RATE_LIMIT_MAX`, and `AUTH_RATE_LIMIT_MAX`.
 
