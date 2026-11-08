@@ -13,6 +13,7 @@ jest.mock('../../lib/redis', () => ({
 import { createApp } from '../../app';
 import { generateToken } from '../../middleware/auth';
 import User from '../../models/user';
+import { generateApiKey } from '../../middleware/apiKey';
 
 process.env.JWT_SECRET = 'test-secret-with-more-than-thirty-two-characters';
 
@@ -74,6 +75,26 @@ describe('market data mutation security', () => {
     const response = await (request(createApp()) as any)[method](path);
     expect(response.status).toBe(401);
     if (method !== 'head') expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('accepts a valid API key for protected read endpoints', async () => {
+    const userId = '64b000000000000000000022';
+    await User.create({
+      _id: userId,
+      email: 'scraper-key-owner@example.com',
+      name: 'Scraper Account',
+      password: 'test-password-hash',
+      role: 'user',
+      isActive: true,
+    });
+    const apiKey = await generateApiKey(userId, 'scraper integration test');
+
+    const response = await request(createApp())
+      .get('/api/v1/')
+      .set('x-api-key', apiKey)
+      .expect(200);
+
+    expect(response.body.version).toBe('1');
   });
 
   it('allows CORS preflight without API credentials', async () => {
