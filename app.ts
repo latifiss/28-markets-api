@@ -1,4 +1,5 @@
 import express, { NextFunction, Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import cors from 'cors';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
@@ -33,6 +34,13 @@ export const allowedOrigins = Array.from(
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
   app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 1));
 
   app.use(cors({
