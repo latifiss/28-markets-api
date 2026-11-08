@@ -1,3 +1,4 @@
+import './strictUpdateValidation';
 import mongoose, { Schema, Document } from 'mongoose';
 
 interface ITreasuryBond extends Document {
