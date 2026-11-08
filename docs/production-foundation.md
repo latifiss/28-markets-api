@@ -29,7 +29,7 @@ The Blueprint sets `NODE_ENV=production`, `PORT=10000`, and a MongoDB pool-size 
 - The process listens on `0.0.0.0` and the Render-provided port.
 - SIGTERM/SIGINT initiate graceful HTTP shutdown and close MongoDB and Redis connections.
 
-Redis is not part of the process readiness probe, but it is mandatory for API request admission. If Redis is unavailable, API requests fail closed with HTTP 503; health liveness remains independent. Monitor Redis connectivity and rate-limit errors.
+Redis is required for API request admission and is included in readiness checks. If Redis is unavailable, API requests fail closed with HTTP 503 and `/health/ready` returns 503; `/health/live` remains independent. Monitor Redis connectivity and rate-limit errors.
 
 ## Cache and scaling direction
 

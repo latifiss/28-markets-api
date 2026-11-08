@@ -64,7 +64,7 @@ Rate-limited responses use HTTP 429 with `Retry-After`, `RateLimit-Limit`, `Rate
 ## Response and operational behavior
 
 - JSON responses; resource handlers retain their existing domain-specific response fields during this route migration.
-- `/health/live` is process liveness; `/health/ready` checks MongoDB readiness.
+- `/health/live` is process liveness; `/health/ready` checks MongoDB and Redis readiness.
 - Anonymous cache-safe GET responses may be served from the shared response cache.
 - Requests with credentials or cookies bypass shared public response caching.
 - Mutations are protected centrally before they reach route handlers.

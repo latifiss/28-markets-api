@@ -8,6 +8,7 @@ import { protectMutations } from './middleware/protectMutations';
 import { optionalApiIdentity } from './middleware/optionalApiIdentity';
 import { apiIpRateLimit, apiRateLimit } from './middleware/rateLimit';
 import { publicResponseCache } from './middleware/publicResponseCache';
+import { getRedisClient } from './lib/redis';
 
 const defaultAllowedOrigins = [
   'http://localhost:4000',
@@ -50,11 +51,18 @@ export function createApp() {
     res.status(200).json({ status: 'ok' });
   });
 
-  app.get('/health/ready', (_req, res) => {
+  app.get('/health/ready', async (_req, res) => {
     const databaseReady = mongoose.connection.readyState === 1;
-    res.status(databaseReady ? 200 : 503).json({
-      status: databaseReady ? 'ready' : 'not_ready',
-      dependencies: { mongodb: databaseReady ? 'connected' : 'disconnected' },
+    const redis = await getRedisClient();
+    const redisReady = Boolean(redis?.isReady);
+    const ready = databaseReady && redisReady;
+
+    res.status(ready ? 200 : 503).json({
+      status: ready ? 'ready' : 'not_ready',
+      dependencies: {
+        mongodb: databaseReady ? 'connected' : 'disconnected',
+        redis: redisReady ? 'connected' : 'disconnected',
+      },
     });
   });
 

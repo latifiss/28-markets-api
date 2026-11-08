@@ -11,9 +11,10 @@ describe('health endpoints', () => {
       });
   });
 
-  it('reports readiness only when MongoDB is connected', async () => {
+  it('reports readiness only when MongoDB and Redis are available', async () => {
     const response = await request(createApp()).get('/health/ready');
     expect([200, 503]).toContain(response.status);
     expect(response.body.dependencies).toHaveProperty('mongodb');
+    expect(response.body.dependencies).toHaveProperty('redis');
   });
 });
