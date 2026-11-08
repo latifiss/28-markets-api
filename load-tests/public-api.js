@@ -1,27 +1,38 @@
 import http from 'k6/http';
 import { check } from 'k6';
 
-const baseUrl = __ENV.BASE_URL;
-if (!baseUrl) {
-  throw new Error('Set BASE_URL to the deployed API origin');
-}
+const baseUrl = (__ENV.BASE_URL || '').replace(/\\/$/, '');
+const apiKey = __ENV.API_KEY;
+
+if (!baseUrl) throw new Error('Set BASE_URL to the deployed API origin');
+if (!apiKey) throw new Error('Set API_KEY to a dedicated load-test API key');
+
+const duration = __ENV.DURATION || '30m';
+const targetRps = Number(__ENV.TARGET_RPS || 600);
 
 export const options = {
   discardResponseBodies: true,
   scenarios: {
-    market_data_reads: {
-      executor: 'ramping-arrival-rate',
-      startRate: 100,
+    sustained_market_reads: {
+      executor: 'constant-arrival-rate',
+      rate: targetRps,
       timeUnit: '1s',
-      preAllocatedVUs: 500,
-      maxVUs: 3000,
+      duration,
+      preAllocatedVUs: Number(__ENV.PREALLOCATED_VUS || 1000),
+      maxVUs: Number(__ENV.MAX_VUS || 5000),
+    },
+    peak_burst: {
+      executor: 'ramping-arrival-rate',
+      startRate: 0,
+      timeUnit: '1s',
+      preAllocatedVUs: 1000,
+      maxVUs: 5000,
       stages: [
-        { target: 500, duration: '2m' },
-        { target: 1000, duration: '3m' },
-        { target: 2000, duration: '3m' },
+        { target: 1000, duration: '1m' },
         { target: 2000, duration: '5m' },
-        { target: 0, duration: '2m' },
+        { target: 0, duration: '1m' },
       ],
+      startTime: duration,
     },
   },
   thresholds: {
@@ -32,9 +43,12 @@ export const options = {
 };
 
 export default function () {
-  const response = http.get(`${baseUrl}/api/forex`, {
-    headers: { Accept: 'application/json' },
-    tags: { endpoint: 'public-forex-list' },
+  const response = http.get(`${baseUrl}/api/v1/forex/pairs`, {
+    headers: {
+      Accept: 'application/json',
+      'X-API-Key': apiKey,
+    },
+    tags: { endpoint: 'authenticated-forex-pairs-list' },
   });
 
   check(response, {
