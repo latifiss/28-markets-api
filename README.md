@@ -32,7 +32,7 @@ The API key is displayed once when created. Only a SHA-256 hash is stored. Never
 | FX pairs | `/forex/pairs` | `GET /`, `GET /:code`, `GET /:code/history` |
 | Interbank FX | `/forex/interbank-pairs` | `GET /`, `GET /:id`, `GET /:id/history` |
 | Commodities | `/commodities` | `GET /`, `GET /:code`, `GET /:code/history` |
-| Gold prices | `/gold/prices` | `GET /`, `GET /:code`, `GET /price-history/:code` |
+| Gold prices | `/gold/prices` | `GET /`, `GET /:code`, `GET /:code/history` |
 | Economic indicators | `/economic-indicators` | `GET /interest-rate`, `GET /inflation-rate/latest`, `GET /indicators/latest-all` |
 | Treasury bonds | `/treasury/bonds` | `GET /`, `GET /active`, `GET /highest-yielding`, `GET /:id` |
 | Equities | `/equities` | `GET /profiles/:company_id`, `GET /price-history/:company_id`, `GET /exchanges/:exchangeSymbol/market-movers`, `GET /companies/:company_id/overview` |

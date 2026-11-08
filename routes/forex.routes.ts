@@ -47,7 +47,7 @@ router.put('/:code/latest', updateLatestPrice);
 
 router.put('/:code/history/:entryId', updatePriceHistoryEntry);
 router.delete('/:code/history/:entryId', deletePriceHistoryEntry);
-router.delete('/:code/history/clear/all', clearPriceHistory);
+router.delete('/:code/history', clearPriceHistory);
 
 router.post('/bulk', bulkCreateForex);
 router.put('/bulk', bulkUpdateForex);

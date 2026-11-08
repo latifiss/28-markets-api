@@ -24,7 +24,7 @@ The canonical prefix is `/api/v1`. Route methods are classified centrally:
 
 Crypto collection and detail routes use explicit resource names: `/crypto`, `/crypto/symbols/:symbol`, `/crypto/ids/:id`, `/crypto/symbols/:symbol/history`, and `/crypto/symbols/:symbol/overview`. Gainers, losers and history use `/crypto/gainers`, `/crypto/losers` and `/crypto/history`.
 
-Equity company overview is `/equities/companies/:company_id/overview`; exchange analytics are under `/equities/exchanges/:exchangeSymbol`; market status is `/equities/market/status`. Market events use `/events/:id`, `/events/codes/:code`, `/events/types/:type`, and `/events/states/:state`.
+Equity company overview is `/equities/companies/:company_id/overview`; exchange analytics are under `/equities/exchanges/:exchangeSymbol`; market status is `/equities/market/status`. Gold history uses `/gold/prices/:code/history`. Event resources use `/events/:id`, `/events/codes/:code`, `/events/types/:type`, and `/events/states/:state`.
 
 The Forex bulk query and export operations are read-only POST endpoints because they accept structured filters in the request body. Treasury return calculation is also read-only. Other market-data POST/PUT/PATCH/DELETE operations require administrator credentials.
 

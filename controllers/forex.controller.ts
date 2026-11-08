@@ -1962,114 +1962,153 @@ export const bulkImportForex = async (req: Request, res: Response): Promise<void
 
 export const bulkGetForex = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { codes, from_currency, to_currency, min_price, max_price, limit = 100, page = 1 } = req.body;
+    const body = req.body || {};
+    if (body.codes !== undefined && !Array.isArray(body.codes)) {
+      res.status(400).json({ success: false, code: 400, message: 'codes must be an array' });
+      return;
+    }
+    if (Array.isArray(body.codes) && body.codes.length > 1000) {
+      res.status(400).json({ success: false, code: 400, message: 'A maximum of 1000 currency codes is allowed' });
+      return;
+    }
+
+    const rawLimit = Number(body.limit ?? 100);
+    const rawPage = Number(body.page ?? 1);
+    const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 100;
+    const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 100000) : 1;
 
     const query: any = {};
-    
-    if (codes && Array.isArray(codes) && codes.length > 0) {
-      query.code = { $in: codes };
+    if (Array.isArray(body.codes) && body.codes.length > 0) {
+      query.code = {
+        $in: body.codes
+          .filter((code: unknown): code is string => typeof code === 'string')
+          .map((code: string) => code.trim().toUpperCase())
+          .filter((code: string) => code.length > 0 && code.length <= 20),
+      };
     }
-    
-    if (from_currency) {
-      query.from_currency = from_currency;
+
+    if (typeof body.from_currency === 'string' && body.from_currency.trim()) {
+      query.from_currency = body.from_currency.trim();
     }
-    
-    if (to_currency) {
-      query.to_currency = to_currency;
+    if (typeof body.to_currency === 'string' && body.to_currency.trim()) {
+      query.to_currency = body.to_currency.trim();
     }
-    
-    if (min_price !== undefined || max_price !== undefined) {
+
+    const minPrice = body.min_price === undefined ? undefined : Number(body.min_price);
+    const maxPrice = body.max_price === undefined ? undefined : Number(body.max_price);
+    if (
+      (minPrice !== undefined && !Number.isFinite(minPrice)) ||
+      (maxPrice !== undefined && !Number.isFinite(maxPrice)) ||
+      (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice)
+    ) {
+      res.status(400).json({ success: false, code: 400, message: 'Price range is invalid' });
+      return;
+    }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
       query.currentPrice = {};
-      if (min_price !== undefined) query.currentPrice.$gte = min_price;
-      if (max_price !== undefined) query.currentPrice.$lte = max_price;
+      if (minPrice !== undefined) query.currentPrice.$gte = minPrice;
+      if (maxPrice !== undefined) query.currentPrice.$lte = maxPrice;
     }
 
     const skip = (page - 1) * limit;
-    
     const [forexPairs, total] = await Promise.all([
-      Forex.find(query).skip(skip).limit(limit).sort({ code: 1 }),
+      Forex.find(query).select('-__v').skip(skip).limit(limit).sort({ code: 1 }).lean(),
       Forex.countDocuments(query),
     ]);
-
-    const result = {
-      total,
-      page,
-      limit,
-      total_pages: Math.ceil(total / limit),
-      data: forexPairs,
-    };
 
     res.status(200).json({
       success: true,
       code: 200,
-      data: result,
+      data: {
+        total,
+        page,
+        limit,
+        total_pages: Math.ceil(total / limit),
+        data: forexPairs,
+      },
     });
   } catch (error: any) {
     console.error('Bulk get forex error:', error);
     res.status(500).json({
       success: false,
       code: 500,
-      message: 'Internal server error during bulk forex fetch',
-      errorId: `ERR-${Date.now()}`,
+      message: 'Unable to fetch forex pairs',
     });
   }
 };
 
 export const bulkExportForex = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { codes, includeHistory = false, historyLimit = 100 } = req.body;
+    const body = req.body || {};
+    const MAX_EXPORT_RECORDS = 500;
+    const codes = body.codes === undefined ? [] : body.codes;
+
+    if (!Array.isArray(codes) || codes.length > MAX_EXPORT_RECORDS) {
+      res.status(400).json({
+        success: false,
+        code: 400,
+        message: 'codes must be an array containing no more than 500 entries',
+      });
+      return;
+    }
 
     const query: any = {};
-    if (codes && Array.isArray(codes) && codes.length > 0) {
-      query.code = { $in: codes };
+    if (codes.length > 0) {
+      query.code = {
+        $in: codes
+          .filter((code: unknown): code is string => typeof code === 'string')
+          .map((code: string) => code.trim().toUpperCase())
+          .filter((code: string) => code.length > 0 && code.length <= 20),
+      };
     }
 
-    const forexPairs = await Forex.find(query).sort({ code: 1 });
+    const includeHistory = body.includeHistory === true;
+    const rawHistoryLimit = Number(body.historyLimit ?? 100);
+    const historyLimit = Number.isSafeInteger(rawHistoryLimit) && rawHistoryLimit > 0
+      ? Math.min(rawHistoryLimit, 100)
+      : 100;
 
-    if (includeHistory) {
-      const exportData = [];
-      
-      for (const forex of forexPairs) {
-        const priceHistory = await PriceHistory.findOne(
-          { forex_code: forex.code },
-          { history: { $slice: historyLimit } }
-        );
-        
-        exportData.push({
-          ...forex.toObject(),
-          priceHistory: priceHistory ? priceHistory.history : [],
-        });
-      }
-      
-      res.status(200).json({
-        success: true,
-        code: 200,
-        data: exportData,
-        metadata: {
-          total_exported: exportData.length,
-          include_history: includeHistory,
-          history_limit: historyLimit,
-          export_date: new Date(),
-        },
-      });
-    } else {
-      res.status(200).json({
-        success: true,
-        code: 200,
-        data: forexPairs,
-        metadata: {
-          total_exported: forexPairs.length,
-          export_date: new Date(),
-        },
-      });
+    const [forexPairs, total] = await Promise.all([
+      Forex.find(query).select('-__v').sort({ code: 1 }).limit(MAX_EXPORT_RECORDS).lean(),
+      Forex.countDocuments(query),
+    ]);
+
+    let exportData: any[] = forexPairs;
+    if (includeHistory && forexPairs.length > 0) {
+      const histories = await PriceHistory.find(
+        { forex_code: { $in: forexPairs.map((pair: any) => pair.code) } },
+        { forex_code: 1, history: { $slice: historyLimit } },
+      ).lean();
+      const historyByCode = new Map(
+        histories.map((item: any) => [item.forex_code, item.history || []]),
+      );
+      exportData = forexPairs.map((pair: any) => ({
+        ...pair,
+        priceHistory: historyByCode.get(pair.code) || [],
+      }));
     }
+
+    res.status(200).json({
+      success: true,
+      code: 200,
+      data: exportData,
+      metadata: {
+        total_available: total,
+        total_exported: exportData.length,
+        limit: MAX_EXPORT_RECORDS,
+        truncated: total > MAX_EXPORT_RECORDS,
+        include_history: includeHistory,
+        history_limit: includeHistory ? historyLimit : 0,
+        export_date: new Date(),
+      },
+    });
   } catch (error: any) {
     console.error('Bulk export forex error:', error);
     res.status(500).json({
       success: false,
       code: 500,
-      message: 'Internal server error during bulk forex export',
-      errorId: `ERR-${Date.now()}`,
+      message: 'Unable to export forex pairs',
     });
   }
 };

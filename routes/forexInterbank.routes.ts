@@ -33,6 +33,6 @@ router.get('/price-history/:bankCode/period/:period', getInterbankPairHistoryByP
 router.get('/price-history/:bankCode/latest', getLatestPriceHistory);
 router.put('/price-history/:bankCode/:entryId', updatePriceHistoryEntry);
 router.delete('/price-history/:bankCode/:entryId', deletePriceHistoryEntry);
-router.delete('/price-history/:bankCode/clear/all', clearPriceHistory);
+router.delete('/price-history/:bankCode', clearPriceHistory);
 
 export default router;
