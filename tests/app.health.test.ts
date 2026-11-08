@@ -1,4 +1,5 @@
 import request from 'supertest';
+jest.mock('../lib/redis', () => ({ getRedisClient: async () => null }));
 import { createApp } from '../app';
 
 describe('health endpoints', () => {
