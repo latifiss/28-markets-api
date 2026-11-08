@@ -12,6 +12,7 @@ jest.mock('../../lib/redis', () => ({
 
 import { createApp } from '../../app';
 import { generateToken } from '../../middleware/auth';
+import User from '../../models/user';
 
 process.env.JWT_SECRET = 'test-secret-with-more-than-thirty-two-characters';
 
@@ -102,6 +103,32 @@ describe('market data mutation security', () => {
       .delete('/api/v1/forex/pairs/USD-GHS');
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('does not trust a stale admin role claim after the account is demoted', async () => {
+    const userId = '64b000000000000000000021';
+    await User.create({
+      _id: userId,
+      email: 'demoted-admin@example.com',
+      name: 'Demoted Administrator',
+      password: 'test-password-hash',
+      role: 'user',
+      isActive: true,
+    });
+
+    const staleAdminToken = generateToken({
+      userId,
+      email: 'demoted-admin@example.com',
+      role: 'admin',
+    });
+
+    const response = await request(createApp())
+      .post('/api/v1/forex/pairs')
+      .set('Authorization', `Bearer ${staleAdminToken}`)
+      .send({});
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('ADMIN_REQUIRED');
   });
 
   it('rejects authenticated non-admin users from market-data writes', async () => {
