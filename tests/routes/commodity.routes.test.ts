@@ -12,6 +12,7 @@ jest.mock('../../lib/redis', () => ({
 
 import { createApp } from '../../app';
 import { generateToken } from '../../middleware/auth';
+import User from '../../models/user';
 import Commodity from '../../models/commodity.model';
 
 describe('Commodity routes', () => {
@@ -26,7 +27,15 @@ describe('Commodity routes', () => {
       last_updated: new Date(),
     });
 
-    const token = generateToken({ userId: '64b000000000000000000013', email: 'admin@example.com', role: 'admin' });
+    await User.create({
+      _id: '64b000000000000000000013',
+      email: 'commodity-admin@example.com',
+      name: 'Test Administrator',
+      password: 'test-password-hash',
+      role: 'admin',
+      isActive: true,
+    });
+    const token = generateToken({ userId: '64b000000000000000000013', email: 'commodity-admin@example.com', role: 'admin' });
     const response = await request(createApp())
       .post('/api/v1/commodities/GOLD/price')
       .set('Authorization', `Bearer ${token}`)
