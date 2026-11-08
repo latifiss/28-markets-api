@@ -54,7 +54,7 @@ The route modules also expose history, statistics, dividends, earnings, financia
 
 Redis-backed token buckets apply across all Render instances:
 
-- Public and authenticated reads: 600 requests/minute per identity by default.
+- Authenticated reads: 600 requests/minute per account by default.
 - Mutations: 60 requests/minute per identity by default.
 - IP ingress guard: 1,200 requests/minute per source IP by default.
 - Login and registration: 10 attempts per 15 minutes per IP by default.
