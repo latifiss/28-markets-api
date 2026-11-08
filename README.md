@@ -6,7 +6,7 @@ A versioned financial-market data API for currencies, equities, indices, commodi
 
 `https://<your-render-service>.onrender.com/api/v1`
 
-All `/api/v1` endpoints require either a bearer JWT or an API key. The only API bootstrap exceptions are `POST /auth/register` and `POST /auth/login`; operational health checks remain public for Render. Send credentials using:
+All `/api/v1` endpoints and the root API information endpoint require either a bearer JWT or an API key. The only API bootstrap exceptions are `POST /auth/register` and `POST /auth/login`; operational health checks remain public for Render. Send credentials using:
 
 ```http
 X-API-Key: <your-api-key>
@@ -66,7 +66,7 @@ Rate-limited responses use HTTP 429 with `Retry-After`, `RateLimit-Limit`, `Rate
 ## Response and operational behavior
 
 - JSON responses; resource handlers retain their existing domain-specific response fields during this route migration.
-- `/health/live` is process liveness; `/health/ready` checks MongoDB and Redis readiness.
+- `/health/live` is process liveness; `/health/ready` checks MongoDB and Redis readiness. These two platform health probes remain public so Render can monitor the service.
 - Authenticated responses bypass the shared public response cache; the API no longer serves anonymous market-data reads.
 - Mutations are protected centrally before they reach route handlers.
 
