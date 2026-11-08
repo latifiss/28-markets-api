@@ -1,7 +1,8 @@
 import http from 'k6/http';
 import { check } from 'k6';
 
-const baseUrl = (__ENV.BASE_URL || '').replace(/\\/$/, '');
+const rawBaseUrl = __ENV.BASE_URL || '';
+const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
 const apiKey = __ENV.API_KEY;
 
 if (!baseUrl) throw new Error('Set BASE_URL to the deployed API origin');
