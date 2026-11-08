@@ -44,6 +44,7 @@ Suggested initial TTLs are documented as policies to validate against provider u
 ## Operational gates before production traffic
 
 - Protect and audit every mutation/admin route across all market-data modules.
+- Apply Mongoose schema validators to query-based update operations so updates do not silently bypass model validators.
 - Migrate API-key storage to hashes with a compatibility/revocation plan.
 - Replace process-local rate limiting and synchronous usage writes with shared, atomic counters and asynchronous aggregation.
 - Implement centralized cache keys, TTL policy, stampede protection, invalidation and cache warming.
@@ -53,7 +54,7 @@ Suggested initial TTLs are documented as policies to validate against provider u
 
 ## Market-data write authorization
 
-All market-data writes under the API prefixes are protected centrally. A valid JWT or API key is required, and the authenticated account must have `role: "admin"`. The Forex bulk query/export and treasury return-calculation POST routes are explicitly read-only and require a valid API key or bearer token, but do not require administrator privileges. The optional `MARKET_DATA_ADMIN_USER_IDS` environment variable supports a comma-separated allowlist while existing accounts are migrated. New accounts default to the `user` role. Promote trusted operators explicitly in the database; do not grant admin role to ordinary API consumers.
+All market-data writes under the API prefixes are protected centrally. A valid JWT or API key is required, and the account must currently be active and have `role: "admin"` (or be in the explicit admin ID allowlist). Administrator status is re-read from MongoDB for each write rather than trusting a stale JWT role claim. The Forex bulk query/export and treasury return-calculation POST routes are explicitly read-only and require a valid API key or bearer token, but do not require administrator privileges. The optional `MARKET_DATA_ADMIN_USER_IDS` environment variable supports a comma-separated allowlist while existing accounts are migrated. New accounts default to the `user` role. Promote trusted operators explicitly in the database; do not grant admin role to ordinary API consumers.
 
 New API keys are stored as SHA-256 hashes. Existing plaintext keys are migrated to hashes on their next successful authentication, then the legacy plaintext field is unset. Revoke and reissue keys if any legacy key has been exposed.
 
