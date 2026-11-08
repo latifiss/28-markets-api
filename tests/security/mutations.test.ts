@@ -53,6 +53,7 @@ describe('market data mutation security', () => {
   });
 
   it.each([
+    '/',
     '/api/v1/',
     '/api/v1/forex/pairs',
     '/api/v1/crypto',
@@ -72,6 +73,14 @@ describe('market data mutation security', () => {
     const response = await (request(createApp()) as any)[method](path);
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('allows CORS preflight without API credentials', async () => {
+    const response = await request(createApp())
+      .options('/api/v1/crypto')
+      .set('Origin', 'https://28-markets.com')
+      .set('Access-Control-Request-Method', 'GET');
+    expect(response.status).toBe(204);
   });
 
   it('keeps registration and login available for credential bootstrap', async () => {
