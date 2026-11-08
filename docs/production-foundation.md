@@ -9,7 +9,7 @@ This repository is being prepared for a stateless, horizontally scalable API dep
 - Upstash Redis: shared cache and coordination layer. Configure the TLS `REDIS_URL` as a Render secret.
 - Cloudflare: recommended in front of Render for CDN caching of explicitly public, cache-safe GET endpoints, WAF and edge protection.
 
-The initial Blueprint is intentionally limited to the API web service. A background worker and scheduler should be added after ingestion and refresh jobs have explicit worker entry points; deploying placeholder processes would create operational risk.
+The Blueprint provisions the API web service and a dedicated usage-analytics worker. Market-data ingestion workers should be added only after provider adapters and refresh jobs have explicit, tested entry points.
 
 ## Required Render environment
 
@@ -29,7 +29,7 @@ The Blueprint sets `NODE_ENV=production`, `PORT=10000`, and a MongoDB pool-size 
 - The process listens on `0.0.0.0` and the Render-provided port.
 - SIGTERM/SIGINT initiate graceful HTTP shutdown and close MongoDB and Redis connections.
 
-Redis is deliberately not part of the readiness response yet: the existing API has code paths that tolerate cache unavailability. Before making Redis mandatory for admission control or moving to a strict cache dependency, define and test the intended degraded-mode policy.
+Redis is not part of the process readiness probe, but it is mandatory for API request admission. If Redis is unavailable, API requests fail closed with HTTP 503; health liveness remains independent. Monitor Redis connectivity and rate-limit errors.
 
 ## Cache and scaling direction
 
@@ -59,12 +59,12 @@ New API keys are stored as SHA-256 hashes. Existing plaintext keys are migrated 
 
 ## Cache namespaces
 
-Controllers use the shared cache module. Keys are namespaced and versioned; invalidation increments a namespace version rather than scanning Redis keys. L1 entries expire after one second to bound cross-instance staleness. Default TTLs are selected by data domain and can be overridden per call. The generic public response cache bypasses authenticated, cookie-bearing, billing, usage and IP-limited economic requests.
+Controllers use the shared cache module. Keys are namespaced and versioned; invalidation increments a namespace version rather than scanning Redis keys. L1 entries expire after one second to bound cross-instance staleness. Default TTLs are selected by data domain and can be overridden per call. The generic public response cache bypasses authenticated, cookie-bearing and account-management requests.
 
 
 ## Public API operating model
 
-The canonical public interface is versioned under `/api/v1`. Market-data GET requests are public; market-data mutations require an administrator. There are no paid tiers, subscription entitlements or monthly request quotas. Rate limits are abuse controls, independent of account plan.
+The canonical public interface is versioned under `/api/v1`. Market-data GET requests are public; market-data mutations require an administrator. A single shared rate-limit policy protects the service.
 
 ## Distributed rate limiting
 

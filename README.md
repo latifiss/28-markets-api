@@ -47,7 +47,6 @@ The route modules also expose history, statistics, dividends, earnings, financia
 - All market-data mutations (POST/PUT/PATCH/DELETE) require an authenticated administrator.
 - Administrator access is granted by the account `role: admin` or the `MARKET_DATA_ADMIN_USER_IDS` allowlist.
 - Account and API-key management endpoints require a bearer JWT.
-- Billing, subscriptions and paid-plan entitlements are not part of this API.
 
 ## Rate limits
 
@@ -58,7 +57,7 @@ Redis-backed token buckets apply across all Render instances:
 - IP ingress guard: 1,200 requests/minute per source IP by default.
 - Login and registration: 10 attempts per 15 minutes per IP by default.
 
-Tune with `API_RATE_LIMIT_MAX`, `API_WRITE_RATE_LIMIT_MAX`, `API_IP_RATE_LIMIT_MAX`, and `AUTH_RATE_LIMIT_MAX`. Limits are global service-abuse controls, not pricing tiers or monthly allowances. Redis failure returns HTTP 503 rather than silently disabling protection.
+Tune with `API_RATE_LIMIT_MAX`, `API_WRITE_RATE_LIMIT_MAX`, `API_IP_RATE_LIMIT_MAX`, and `AUTH_RATE_LIMIT_MAX`. Limits are global service-abuse controls and apply consistently to every API consumer. Redis failure returns HTTP 503 rather than silently disabling protection.
 
 Rate-limited responses use HTTP 429 with `Retry-After`, `RateLimit-Limit`, `RateLimit-Remaining`, and a machine-readable error code.
 

@@ -39,7 +39,7 @@ router.post('/', createCrypto);
 router.put('/symbols/:symbol', updateCryptoBySymbol);
 router.put('/ids/:id', updateCryptoById);
 router.delete('/symbols/:symbol', deleteCrypto);
-router.post('/:symbol/price', updateCryptoPrice);
+router.post('/symbols/:symbol/price', updateCryptoPrice);
 router.post('/symbols/:symbol/history', addCryptoHistory);
 
 router.get('/', getAllCryptos);

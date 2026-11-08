@@ -5,7 +5,7 @@ The canonical prefix is `/api/v1`. Route methods are classified centrally:
 - `GET`, `HEAD`, `OPTIONS`: public market-data reads.
 - `POST`, `PUT`, `PATCH`, `DELETE`: administrator-only market-data operations.
 - `/auth/*`: account authentication and API-key management.
-- `/account/usage`: authenticated usage analytics; it is not a billing or quota endpoint.
+- `/account/usage`: authenticated usage analytics.
 
 ## Canonical resource prefixes
 
@@ -43,4 +43,4 @@ Infrastructure and rate-limit errors use stable machine-readable codes. Rate lim
 | `API_IP_RATE_LIMIT_MAX` | 1200 | requests/minute per source IP, before authentication |
 | `AUTH_RATE_LIMIT_MAX` | 10 | login/registration attempts per 15-minute window |
 
-Token buckets are atomic Lua scripts in shared Redis. Limits are independent of account role and do not impose monthly quotas.
+Token buckets are atomic Lua scripts in shared Redis. The same rate-limit policy applies to every API consumer.

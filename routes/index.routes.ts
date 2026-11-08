@@ -12,20 +12,13 @@ import {
 
 const router = express.Router();
 
+router.get('/', getAllIndices);
 router.post('/', createIndex);
-router.put('//:code', updateIndex);
-router.delete('//:code', deleteIndex);
-router.post('//:code/price', updateIndexPrice);
-router.post('//:code/history', addIndexHistory);
-
-router.get('/', getAllIndices);
-router.get('//:code', getIndexByCode);
-router.get('//:code/history', getIndexHistory);
-
-router.get('/', getAllIndices);
 router.get('/:code', getIndexByCode);
+router.put('/:code', updateIndex);
+router.delete('/:code', deleteIndex);
+router.post('/:code/price', updateIndexPrice);
 router.get('/:code/history', getIndexHistory);
-
 router.post('/:code/history', addIndexHistory);
 
 export default router;

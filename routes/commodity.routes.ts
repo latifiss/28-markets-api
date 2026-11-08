@@ -19,24 +19,20 @@ import {
 
 const router = express.Router();
 
-// Public routes
-router.post('/', createCommodity);
 router.get('/', getAllCommodities);
-router.get('//:code', getCommodityByCode);
-router.put('//:code', updateCommodity);
-router.delete('//:code', deleteCommodity);
-router.post('//:code/price', updateCommodityPrice);
-
-router.get('//:code/history', getCommodityHistory);
-router.post('//:code/history', addCommodityHistory);
-router.get('//:code/history/period/:period', getCommodityHistoryByPeriod);
-router.get('//:code/history/latest', getLatestPriceHistory);
-
-router.post('//:code/entries', addPriceEntry);
-router.put('//:code/latest', updateLatestPrice);
-
-router.put('//:code/history/:entryId', updatePriceHistoryEntry);
-router.delete('//:code/history/:entryId', deletePriceHistoryEntry);
-router.delete('//:code/history/clear/all', clearPriceHistory);
+router.post('/', createCommodity);
+router.get('/:code', getCommodityByCode);
+router.put('/:code', updateCommodity);
+router.delete('/:code', deleteCommodity);
+router.post('/:code/price', updateCommodityPrice);
+router.get('/:code/history', getCommodityHistory);
+router.post('/:code/history', addCommodityHistory);
+router.get('/:code/history/period/:period', getCommodityHistoryByPeriod);
+router.get('/:code/history/latest', getLatestPriceHistory);
+router.post('/:code/entries', addPriceEntry);
+router.put('/:code/latest', updateLatestPrice);
+router.put('/:code/history/:entryId', updatePriceHistoryEntry);
+router.delete('/:code/history/:entryId', deletePriceHistoryEntry);
+router.delete('/:code/history/clear/all', clearPriceHistory);
 
 export default router;

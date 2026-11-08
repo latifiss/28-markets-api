@@ -1,6 +1,6 @@
 const required = (name: string): string => {
   const value = process.env[name]?.trim();
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  if (!value) throw new Error(\`Missing required environment variable: \${name}\`);
   return value;
 };
 
@@ -9,7 +9,7 @@ const validatePositiveInteger = (name: string): void => {
   if (raw === undefined || raw.trim() === '') return;
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new Error(`${name} must be a positive integer`);
+    throw new Error(\`\${name} must be a positive integer\`);
   }
 };
 
@@ -21,13 +21,13 @@ export const validateEnvironment = (): void => {
     throw new Error('JWT_SECRET must contain at least 32 characters');
   }
 
-  if (!/^mongodb(?:\\+srv)?:\\/\\//i.test(mongoUri)) {
+  if (!/^mongodb(?:\+srv)?:\/\//i.test(mongoUri)) {
     throw new Error('MONGODB_URI must be a valid MongoDB connection URI');
   }
 
   if (process.env.NODE_ENV === 'production') {
     const redisUrl = required('REDIS_URL');
-    if (!/^rediss:\\/\\//i.test(redisUrl)) {
+    if (!/^rediss:\/\//i.test(redisUrl)) {
       throw new Error('Production REDIS_URL must use TLS (rediss://)');
     }
   }

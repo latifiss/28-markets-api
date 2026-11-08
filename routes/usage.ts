@@ -11,7 +11,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
       ? req.query.month
       : new Date().toISOString().slice(0, 7);
 
-    if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(yearMonth)) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(yearMonth)) {
       return res.status(400).json({ error: 'month must use YYYY-MM format' });
     }
 

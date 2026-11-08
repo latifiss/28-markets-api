@@ -13,14 +13,14 @@ import {
 
 const router = express.Router();
 
-router.post('/', createTreasuryBond);
-router.put('//:id', updateTreasuryBond);
-router.delete('//:id', deleteTreasuryBond);
-router.post('//bulk', bulkUpdateTreasuryBonds);
 router.get('/', getAllTreasuryBonds);
-router.get('//active', getActiveTreasuryBonds);
-router.get('//highest-yielding', getHighestYieldingBonds);
-router.get('//:id', getTreasuryBond);
-router.post('//:id/calculate', calculateInvestmentReturn);
+router.post('/', createTreasuryBond);
+router.get('/active', getActiveTreasuryBonds);
+router.get('/highest-yielding', getHighestYieldingBonds);
+router.post('/bulk', bulkUpdateTreasuryBonds);
+router.get('/:id', getTreasuryBond);
+router.put('/:id', updateTreasuryBond);
+router.delete('/:id', deleteTreasuryBond);
+router.post('/:id/calculate', calculateInvestmentReturn);
 
 export default router;

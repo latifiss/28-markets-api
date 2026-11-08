@@ -19,19 +19,16 @@ import {
 
 const router = express.Router();
 
-router.post('/', createInterbankPair);
 router.get('/', getAllInterbankPairs);
-router.get('//:id', getInterbankPair);
-router.put('//:id', updateInterbankPair);
-router.delete('//:id', deleteInterbankPair);
-router.put('//:id/prices', updatePrices);
-
-router.get('//code/:code', getInterbankPairByCode);
-router.get('//bank/:bankCode', getInterbankPairByBankCode);
-
-router.get('//:id/history', getInterbankPairHistory);
-router.post('//:id/history', addPriceHistory);
-
+router.post('/', createInterbankPair);
+router.get('/code/:code', getInterbankPairByCode);
+router.get('/bank/:bankCode', getInterbankPairByBankCode);
+router.get('/:id', getInterbankPair);
+router.put('/:id', updateInterbankPair);
+router.delete('/:id', deleteInterbankPair);
+router.put('/:id/prices', updatePrices);
+router.get('/:id/history', getInterbankPairHistory);
+router.post('/:id/history', addPriceHistory);
 router.get('/price-history/:bankCode/period/:period', getInterbankPairHistoryByPeriod);
 router.get('/price-history/:bankCode/latest', getLatestPriceHistory);
 router.put('/price-history/:bankCode/:entryId', updatePriceHistoryEntry);
