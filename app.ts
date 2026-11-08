@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 
 import v1Routes from './routes/v1';
 import { protectMutations } from './middleware/protectMutations';
+import { requireApiAuthentication } from './middleware/requireApiAuthentication';
 import { optionalApiIdentity } from './middleware/optionalApiIdentity';
 import { apiIpRateLimit, apiRateLimit } from './middleware/rateLimit';
 import { publicResponseCache } from './middleware/publicResponseCache';
@@ -67,7 +68,14 @@ export function createApp() {
   });
 
   // IP guard runs before credentials are parsed; identity limits run after optional auth.
-  app.use('/api/v1', apiIpRateLimit, optionalApiIdentity, apiRateLimit, publicResponseCache);
+  app.use(
+    '/api/v1',
+    apiIpRateLimit,
+    optionalApiIdentity,
+    requireApiAuthentication,
+    apiRateLimit,
+    publicResponseCache,
+  );
 
   const mutationPrefixes = [
     '/api/v1/crypto',
