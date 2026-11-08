@@ -63,6 +63,17 @@ describe('market data mutation security', () => {
     expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
+  it.each([
+    ['head', '/api/v1/crypto'],
+    ['patch', '/api/v1/forex/pairs/USD-GHS'],
+    ['delete', '/api/v1/forex/pairs/USD-GHS'],
+    ['get', '/api/v1/not-a-real-route'],
+  ])('requires credentials for %s %s, including unknown routes', async (method, path) => {
+    const response = await (request(createApp()) as any)[method](path);
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
   it('keeps registration and login available for credential bootstrap', async () => {
     const registration = await request(createApp())
       .post('/api/v1/auth/register')
