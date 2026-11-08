@@ -6,10 +6,12 @@ A versioned financial-market data API for currencies, equities, indices, commodi
 
 `https://<your-render-service>.onrender.com/api/v1`
 
-All market-data reads are public. An API key is optional for attribution and authenticated account-level rate limiting:
+All `/api/v1` endpoints require either a bearer JWT or an API key. The only API bootstrap exceptions are `POST /auth/register` and `POST /auth/login`; operational health checks remain public for Render. Send credentials using:
 
 ```http
 X-API-Key: <your-api-key>
+# or
+Authorization: Bearer <your-jwt>
 ```
 
 Create and manage API keys using an account JWT:
@@ -42,9 +44,9 @@ The route modules also expose history, statistics, dividends, earnings, financia
 
 ## Authentication and authorization
 
-- Public GET/HEAD requests do not require credentials.
-- API keys and bearer JWTs are optional on public reads.
-- All operations that change stored market data require an authenticated administrator. Read-only POST operations for bulk queries/exports and treasury calculations remain public but rate-limited.
+- Every `/api/v1` endpoint requires a valid API key or bearer JWT, including GET, HEAD, POST, PUT, PATCH and DELETE.
+- Only `POST /auth/register` and `POST /auth/login` are exempt so users can obtain credentials. `/health/live` and `/health/ready` remain public for platform health checks; CORS OPTIONS preflight is also unauthenticated.
+- All operations that change stored market data require an authenticated administrator. Read-only POST operations for bulk queries/exports and treasury calculations require authentication but do not require administrator privileges.
 - Administrator access is granted by the account `role: admin` or the `MARKET_DATA_ADMIN_USER_IDS` allowlist.
 - Account and API-key management endpoints require a bearer JWT.
 
@@ -65,8 +67,7 @@ Rate-limited responses use HTTP 429 with `Retry-After`, `RateLimit-Limit`, `Rate
 
 - JSON responses; resource handlers retain their existing domain-specific response fields during this route migration.
 - `/health/live` is process liveness; `/health/ready` checks MongoDB and Redis readiness.
-- Anonymous cache-safe GET responses may be served from the shared response cache.
-- Requests with credentials or cookies bypass shared public response caching.
+- Authenticated responses bypass the shared public response cache; the API no longer serves anonymous market-data reads.
 - Mutations are protected centrally before they reach route handlers.
 
 ## Compatibility
