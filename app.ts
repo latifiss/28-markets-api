@@ -75,6 +75,31 @@ export function createApp() {
     });
   });
 
+  // Attach a request ID and audit every API write attempt, including rejected requests.
+  app.use('/api/v1', (req, res, next) => {
+    const requestId = randomUUID();
+    const startedAt = Date.now();
+    res.setHeader('X-Request-ID', requestId);
+    const method = req.method.toUpperCase();
+    const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+
+    res.once('finish', () => {
+      if (!isWrite) return;
+      console.info(JSON.stringify({
+        event: 'api_write_attempt',
+        requestId,
+        method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+        userId: (req as any).user?.userId || null,
+        apiKeyId: (req as any).apiKeyId || null,
+        ip: req.ip || req.socket.remoteAddress || null,
+      }));
+    });
+    next();
+  });
+
   // IP guard runs before credentials are parsed; identity limits run after credential validation.
   app.use(
     '/api/v1',
