@@ -1,12 +1,13 @@
 # API endpoint contract
 
-The canonical prefix is `/api/v1`. Route methods are classified centrally:
+The canonical prefix is `/api/v1`. The root API information endpoint (`/`) is also authenticated. Route methods are classified centrally:
 
-- `GET`, `HEAD`, `OPTIONS`: public market-data reads.
-- Mutating `POST`, `PUT`, `PATCH`, and `DELETE` routes: administrator-only.
-- Explicitly read-only POST routes (Forex bulk query/export and treasury return calculation): public and rate-limited.
-- `/auth/*`: account authentication and API-key management.
-- `/account/usage`: authenticated usage analytics.
+- Every `/api/v1` route requires a valid API key or bearer JWT, regardless of HTTP method.
+- `POST /auth/register` and `POST /auth/login` are the only API route exceptions, because they bootstrap credentials. Operational health checks outside `/api/v1` remain public; CORS `OPTIONS` preflight requests are also public.
+- Market-data writes (`POST`, `PUT`, `PATCH`, `DELETE`) require an authenticated administrator.
+- Explicitly read-only POST routes (Forex bulk query/export and treasury return calculation) require authentication but do not require administrator privileges.
+- `/auth/*`: account authentication and API-key management; management operations remain bearer-JWT-only.
+- `/account/usage`: authenticated usage analytics; accepts either JWT or API key.
 
 ## Canonical resource prefixes
 
@@ -27,7 +28,7 @@ Crypto collection and detail routes use explicit resource names: `/crypto`, `/cr
 
 Equity company overview is `/equities/companies/:company_id/overview`; exchange analytics are under `/equities/exchanges/:exchangeSymbol`; market status is `/equities/market/status`. Gold history uses `/gold/prices/:code/history`. Event resources use `/events/:id`, `/events/codes/:code`, `/events/types/:type`, and `/events/states/:state`.
 
-The Forex bulk query and export operations are read-only POST endpoints because they accept structured filters in the request body. Treasury return calculation is also read-only. Other market-data POST/PUT/PATCH/DELETE operations require administrator credentials.
+The Forex bulk query and export operations are read-only POST endpoints because they accept structured filters in the request body. Treasury return calculation is also read-only. These endpoints still require a valid API key or bearer JWT. Other market-data POST/PUT/PATCH/DELETE operations require administrator credentials.
 
 ## API key lifecycle
 
@@ -35,13 +36,13 @@ Keys are 256-bit random secrets. The database stores only SHA-256 hashes. The ra
 
 ## Error shape
 
-Infrastructure and rate-limit errors use stable machine-readable codes. Rate limits return 429; Redis admission failure returns 503; unauthenticated mutations return 401; authenticated non-admin mutations return 403.
+Infrastructure and rate-limit errors use stable machine-readable codes. Rate limits return 429; Redis admission failure returns 503; unauthenticated API requests return 401; authenticated non-admin mutations return 403.
 
 ## Rate limit configuration
 
 | Variable | Default | Scope |
 |---|---:|---|
-| `API_RATE_LIMIT_MAX` | 600 | requests/minute per account for reads |
+| `API_RATE_LIMIT_MAX` | 600 | requests/minute per authenticated account for reads |
 | `API_WRITE_RATE_LIMIT_MAX` | 60 | requests/minute per account for writes |
 | `API_IP_RATE_LIMIT_MAX` | 1200 | requests/minute per source IP, before authentication |
 | `AUTH_RATE_LIMIT_MAX` | 10 | login/registration attempts per 15-minute window |

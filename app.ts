@@ -1,10 +1,12 @@
 import express, { NextFunction, Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import cors from 'cors';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
 
 import v1Routes from './routes/v1';
 import { protectMutations } from './middleware/protectMutations';
+import { requireApiAuthentication } from './middleware/requireApiAuthentication';
 import { optionalApiIdentity } from './middleware/optionalApiIdentity';
 import { apiIpRateLimit, apiRateLimit } from './middleware/rateLimit';
 import { publicResponseCache } from './middleware/publicResponseCache';
@@ -32,6 +34,13 @@ export const allowedOrigins = Array.from(
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
   app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 1));
 
   app.use(cors({
@@ -66,8 +75,40 @@ export function createApp() {
     });
   });
 
-  // IP guard runs before credentials are parsed; identity limits run after optional auth.
-  app.use('/api/v1', apiIpRateLimit, optionalApiIdentity, apiRateLimit, publicResponseCache);
+  // Attach a request ID and audit every API write attempt, including rejected requests.
+  app.use('/api/v1', (req, res, next) => {
+    const requestId = randomUUID();
+    const startedAt = Date.now();
+    res.setHeader('X-Request-ID', requestId);
+    const method = req.method.toUpperCase();
+    const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+
+    res.once('finish', () => {
+      if (!isWrite) return;
+      console.info(JSON.stringify({
+        event: 'api_write_attempt',
+        requestId,
+        method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+        userId: (req as any).user?.userId || null,
+        apiKeyId: (req as any).apiKeyId || null,
+        ip: req.ip || req.socket.remoteAddress || null,
+      }));
+    });
+    next();
+  });
+
+  // IP guard runs before credentials are parsed; identity limits run after credential validation.
+  app.use(
+    '/api/v1',
+    apiIpRateLimit,
+    optionalApiIdentity,
+    requireApiAuthentication,
+    apiRateLimit,
+    publicResponseCache,
+  );
 
   const mutationPrefixes = [
     '/api/v1/crypto',
@@ -86,7 +127,7 @@ export function createApp() {
 
   app.use('/api/v1', v1Routes);
 
-  app.get('/', (_req, res) => {
+  app.get('/', requireApiAuthentication, (_req, res) => {
     res.json({
       name: '28 Markets API',
       status: 'operational',

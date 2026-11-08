@@ -1,3 +1,4 @@
+import './strictUpdateValidation';
 import mongoose, { Schema } from 'mongoose';
 
 const priceHistorySchema = new Schema(

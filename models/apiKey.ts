@@ -1,3 +1,4 @@
+import './strictUpdateValidation';
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IApiKey extends Document {

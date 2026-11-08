@@ -1,3 +1,4 @@
+import './strictUpdateValidation';
 import mongoose, { Schema } from 'mongoose';
 
 interface IPriceHistory {

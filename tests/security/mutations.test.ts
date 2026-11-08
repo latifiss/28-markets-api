@@ -12,6 +12,8 @@ jest.mock('../../lib/redis', () => ({
 
 import { createApp } from '../../app';
 import { generateToken } from '../../middleware/auth';
+import User from '../../models/user';
+import { generateApiKey } from '../../middleware/apiKey';
 
 process.env.JWT_SECRET = 'test-secret-with-more-than-thirty-two-characters';
 
@@ -35,9 +37,119 @@ describe('market data mutation security', () => {
   it.each([
     '/api/v1/forex/pairs/bulk/query',
     '/api/v1/forex/pairs/bulk/export',
-  ])('allows read-only bulk operation %s without administrator credentials', async (path) => {
-    const response = await request(createApp()).post(path).send({});
-    expect(response.status).toBe(200);
+  ])('requires authentication for read-only POST operation %s but not admin privileges', async (path) => {
+    const anonymous = await request(createApp()).post(path).send({});
+    expect(anonymous.status).toBe(401);
+
+    const token = generateToken({
+      userId: '64b000000000000000000002',
+      email: 'reader@example.com',
+      role: 'user',
+    });
+    const authenticated = await request(createApp())
+      .post(path)
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+    expect(authenticated.status).not.toBe(401);
+    expect(authenticated.status).not.toBe(403);
+  });
+
+  it.each([
+    '/',
+    '/api/v1/',
+    '/api/v1/forex/pairs',
+    '/api/v1/crypto',
+    '/api/v1/account/usage',
+  ])('rejects anonymous reads on %s', async (path) => {
+    const response = await request(createApp()).get(path);
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it.each([
+    ['head', '/api/v1/crypto'],
+    ['patch', '/api/v1/forex/pairs/USD-GHS'],
+    ['delete', '/api/v1/forex/pairs/USD-GHS'],
+    ['get', '/api/v1/not-a-real-route'],
+  ])('requires credentials for %s %s, including unknown routes', async (method, path) => {
+    const response = await (request(createApp()) as any)[method](path);
+    expect(response.status).toBe(401);
+    if (method !== 'head') expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('accepts a valid API key for protected read endpoints', async () => {
+    const userId = '64b000000000000000000022';
+    await User.create({
+      _id: userId,
+      email: 'scraper-key-owner@example.com',
+      name: 'Scraper Account',
+      password: 'test-password-hash',
+      role: 'user',
+      isActive: true,
+    });
+    const apiKey = await generateApiKey(userId, 'scraper integration test');
+
+    const response = await request(createApp())
+      .get('/api/v1/')
+      .set('x-api-key', apiKey)
+      .expect(200);
+
+    expect(response.body.version).toBe('1');
+  });
+
+  it('allows CORS preflight without API credentials', async () => {
+    const response = await request(createApp())
+      .options('/api/v1/crypto')
+      .set('Origin', 'https://28-markets.com')
+      .set('Access-Control-Request-Method', 'GET');
+    expect(response.status).toBe(204);
+  });
+
+  it('keeps registration and login available for credential bootstrap', async () => {
+    const registration = await request(createApp())
+      .post('/api/v1/auth/register')
+      .send({});
+    expect(registration.status).toBe(400);
+    expect(registration.body.code).toBe('INVALID_REGISTRATION_INPUT');
+
+    const login = await request(createApp())
+      .post('/api/v1/auth/login')
+      .send({});
+    expect(login.status).toBe(400);
+    expect(login.body.code).toBe('INVALID_LOGIN_INPUT');
+  });
+
+  it('requires credentials for DELETE and other non-bootstrap methods', async () => {
+    const response = await request(createApp())
+      .delete('/api/v1/forex/pairs/USD-GHS');
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('does not trust a stale admin role claim after the account is demoted', async () => {
+    const userId = '64b000000000000000000021';
+    await User.create({
+      _id: userId,
+      email: 'demoted-admin@example.com',
+      name: 'Demoted Administrator',
+      password: 'test-password-hash',
+      role: 'user',
+      isActive: true,
+    });
+
+    const staleAdminToken = generateToken({
+      userId,
+      email: 'demoted-admin@example.com',
+      role: 'admin',
+    });
+
+    const response = await request(createApp())
+      .post('/api/v1/forex/pairs')
+      .set('Authorization', `Bearer ${staleAdminToken}`)
+      .send({});
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('ADMIN_REQUIRED');
   });
 
   it('rejects authenticated non-admin users from market-data writes', async () => {

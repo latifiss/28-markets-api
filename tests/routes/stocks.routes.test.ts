@@ -1,7 +1,4 @@
 import request from 'supertest';
-jest.mock('../../middleware/protectMutations', () => ({
-  protectMutations: (_req: any, _res: any, next: any) => next(),
-}));
 jest.mock('../../lib/redis', () => ({
   getRedisClient: async () => ({
     eval: async (_script: string, options: { keys: string[] }) =>
@@ -14,6 +11,8 @@ jest.mock('../../lib/redis', () => ({
 }));
 
 import { createApp } from '../../app';
+import { generateToken } from '../../middleware/auth';
+import User from '../../models/user';
 import { PriceHistory } from '../../models/stocks.model';
 
 describe('Equities routes', () => {
@@ -27,8 +26,18 @@ describe('Equities routes', () => {
       updatedAt: new Date(),
     });
 
+    await User.create({
+      _id: '64b000000000000000000012',
+      email: 'stocks-admin@example.com',
+      name: 'Test Administrator',
+      password: 'test-password-hash',
+      role: 'admin',
+      isActive: true,
+    });
+    const token = generateToken({ userId: '64b000000000000000000012', email: 'stocks-admin@example.com', role: 'admin' });
     const response = await request(createApp())
       .put(`/api/v1/equities/price-history/${doc.company_id}/latest`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ price: '12.34' })
       .expect(200);
 
