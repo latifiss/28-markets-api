@@ -12,6 +12,7 @@ jest.mock('../../lib/redis', () => ({
 
 import { createApp } from '../../app';
 import { generateToken } from '../../middleware/auth';
+import User from '../../models/user';
 import ForexInterbank from '../../models/forexInterbank.model';
 
 describe('Forex interbank routes', () => {
@@ -34,7 +35,15 @@ describe('Forex interbank routes', () => {
       last_updated: new Date(),
     });
 
-    const token = generateToken({ userId: '64b000000000000000000011', email: 'admin@example.com', role: 'admin' });
+    await User.create({
+      _id: '64b000000000000000000011',
+      email: 'interbank-admin@example.com',
+      name: 'Test Administrator',
+      password: 'test-password-hash',
+      role: 'admin',
+      isActive: true,
+    });
+    const token = generateToken({ userId: '64b000000000000000000011', email: 'interbank-admin@example.com', role: 'admin' });
     const response = await request(createApp())
       .put(`/api/v1/forex/interbank-pairs/${pair._id}/prices`)
       .set('Authorization', `Bearer ${token}`)
