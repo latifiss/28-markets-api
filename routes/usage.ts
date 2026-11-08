@@ -1,11 +1,13 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import { authenticateToken, type AuthRequest } from '../middleware/auth';
+import type { AuthRequest } from '../middleware/auth';
 import Usage from '../models/usage';
 
 const router = express.Router();
 
-router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+// Authentication is enforced once, centrally, for the entire /api/v1 namespace.
+// This route accepts either a bearer token or an API key.
+router.get('/', async (req: AuthRequest, res) => {
   try {
     const yearMonth = typeof req.query.month === 'string'
       ? req.query.month
