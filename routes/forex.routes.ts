@@ -32,35 +32,35 @@ import { rateLimiter } from '../middleware/rateLimiter';
 const router = express.Router();
 
 // Public routes
-router.post('/', createForex);
+router.post('/', unifiedAuth, rateLimiter, createForex);
 router.get('/', getAllForex);
 router.get('/:code', getForex);
-router.put('/:code', updateForex);
-router.delete('/:code', deleteForex);
-router.post('/:code/price', updateForexPrice);
+router.put('/:code', unifiedAuth, rateLimiter, updateForex);
+router.delete('/:code', unifiedAuth, rateLimiter, deleteForex);
+router.post('/:code/price', unifiedAuth, rateLimiter, updateForexPrice);
 
 router.get('/:code/history', getForexHistory);
-router.post('/:code/history', addForexHistory);
+router.post('/:code/history', unifiedAuth, rateLimiter, addForexHistory);
 router.get('/:code/history/period/:period', getForexHistoryByPeriod);
 router.get('/:code/history/latest', getLatestPriceHistory);
 
-router.post('/:code/entries', addPriceEntry);
-router.put('/:code/latest', updateLatestPrice);
+router.post('/:code/entries', unifiedAuth, rateLimiter, addPriceEntry);
+router.put('/:code/latest', unifiedAuth, rateLimiter, updateLatestPrice);
 
-router.put('/:code/history/:entryId', updatePriceHistoryEntry);
-router.delete('/:code/history/:entryId', deletePriceHistoryEntry);
-router.delete('/:code/history/clear/all', clearPriceHistory);
+router.put('/:code/history/:entryId', unifiedAuth, rateLimiter, updatePriceHistoryEntry);
+router.delete('/:code/history/:entryId', unifiedAuth, rateLimiter, deletePriceHistoryEntry);
+router.delete('/:code/history/clear/all', unifiedAuth, rateLimiter, clearPriceHistory);
 
-router.post('/bulk', bulkCreateForex);
-router.put('/bulk', bulkUpdateForex);
-router.delete('/bulk', bulkDeleteForex);
-router.post('/bulk/upsert', bulkUpsertForex);
-router.post('/bulk/prices', bulkUpdateForexPrices);
-router.post('/bulk/history', bulkAddPriceHistoryEntries);
-router.post('/bulk/import', bulkImportForex);
-router.post('/bulk/query', bulkGetForex);
-router.post('/bulk/export', bulkExportForex);
-router.post('/bulk/sync', bulkSyncForexPrices);
+router.post('/bulk', unifiedAuth, rateLimiter, bulkCreateForex);
+router.put('/bulk', unifiedAuth, rateLimiter, bulkUpdateForex);
+router.delete('/bulk', unifiedAuth, rateLimiter, bulkDeleteForex);
+router.post('/bulk/upsert', unifiedAuth, rateLimiter, bulkUpsertForex);
+router.post('/bulk/prices', unifiedAuth, rateLimiter, bulkUpdateForexPrices);
+router.post('/bulk/history', unifiedAuth, rateLimiter, bulkAddPriceHistoryEntries);
+router.post('/bulk/import', unifiedAuth, rateLimiter, bulkImportForex);
+router.post('/bulk/query', unifiedAuth, rateLimiter, bulkGetForex);
+router.post('/bulk/export', unifiedAuth, rateLimiter, bulkExportForex);
+router.post('/bulk/sync', unifiedAuth, rateLimiter, bulkSyncForexPrices);
 
 
 // Key protected routes

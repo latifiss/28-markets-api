@@ -79,10 +79,9 @@ import {
   deleteGovernmentSpending,
   getGovernmentSpendingHistory,
   bulkUpdateIndicators,
-  setCache,
-  getCache,
 } from '../controllers/economic.controller';
 import { apiKeyRateLimit } from '../middleware/rateLimit';
+import { setCache, getCache } from '../lib/cache';
 
 const router = express.Router();
 

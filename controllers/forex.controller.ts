@@ -1,45 +1,7 @@
 import type { Request, Response } from 'express';
 import Forex, { PriceHistory } from '../models/forex.model';
-import { getRedisClient } from '../lib/redis';
+import { setCache, getCache, deleteCacheByPattern } from '../lib/cache';
 import { publishForexUpdate } from '../lib/realtime/ws';
-
-const setCache = async (key: string, data: any, expirationInSeconds = 3600): Promise<void> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.set === 'function') {
-      await client.set(key, JSON.stringify(data), { EX: expirationInSeconds });
-    }
-  } catch (error: any) {
-    console.error('Error setting cache:', error.message);
-  }
-};
-
-const getCache = async (key: string): Promise<any> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.get === 'function') {
-      const data = await client.get(key);
-      return data ? JSON.parse(data) : null;
-    }
-    return null;
-  } catch (error: any) {
-    console.error('Error getting cache:', error.message);
-    return null;
-  }
-};
-
-const deleteCacheByPattern = async (pattern: string): Promise<void> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.scanIterator === 'function') {
-      for await (const key of client.scanIterator({ MATCH: pattern })) {
-        await client.del(key);
-      }
-    }
-  } catch (error: any) {
-    console.error('Error deleting cache by pattern:', error.message);
-  }
-};
 
 const invalidateCache = async (code: string | null = null): Promise<void> => {
   await deleteCacheByPattern('forex:*');

@@ -19,7 +19,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const user = new User({ email, password: hashedPassword, name });
     await user.save();
 
-    const token = generateToken({ userId: String(user._id), email: user.email });
+    const token = generateToken({ userId: String(user._id), email: user.email, tier: user.tier, role: user.role });
 
     res.status(201).json({
       message: 'User created successfully',
@@ -46,7 +46,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = generateToken({ userId: String(user._id), email: user.email });
+    const token = generateToken({ userId: String(user._id), email: user.email, tier: user.tier, role: user.role });
 
     res.json({
       message: 'Login successful',
@@ -71,7 +71,7 @@ export const generateNewApiKey = async (req: AuthRequest, res: Response): Promis
 export const getApiKeys = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user.userId;
-    const keys = await ApiKey.find({ userId, revoked: false }).select('-__v');
+    const keys = await ApiKey.find({ userId, revoked: false }).select('-__v -key -keyHash');
     res.json({ apiKeys: keys });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -9,52 +9,8 @@ import {
   Holders,
   PriceHistory,
 } from '../models/stocks.model';
-import { getRedisClient } from '../lib/redis';
+import { setCache, getCache, deleteCacheByPattern } from '../lib/cache';
 import { publishStockUpdate } from '../lib/realtime/ws';
-
-const setCache = async (
-  key: string,
-  data: any,
-  expirationInSeconds = 3600,
-): Promise<void> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.set === 'function') {
-      await client.set(key, JSON.stringify(data), {
-        EX: expirationInSeconds,
-      });
-    }
-  } catch (error: any) {
-    console.error('Error setting cache:', error.message);
-  }
-};
-
-const getCache = async (key: string): Promise<any> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.get === 'function') {
-      const data = await client.get(key);
-      return data ? JSON.parse(data) : null;
-    }
-    return null;
-  } catch (error: any) {
-    console.error('Error getting cache:', error.message);
-    return null;
-  }
-};
-
-const deleteCacheByPattern = async (pattern: string): Promise<void> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.scanIterator === 'function') {
-      for await (const key of client.scanIterator({ MATCH: pattern })) {
-        await client.del(key);
-      }
-    }
-  } catch (error: any) {
-    console.error('Error deleting cache by pattern:', error.message);
-  }
-};
 
 const invalidateCompanyCache = async (
   company_id: string,
@@ -517,7 +473,7 @@ export const updateStatistics = async (
       { new: true, runValidators: true },
     );
 
-    await invalidateCompanyCache(company_id as string, statistics.ticker_symbol);
+    await invalidateCompanyCache(company_id as string, statistics?.ticker_symbol);
 
     res.status(200).json({
       success: true,
@@ -3071,7 +3027,7 @@ export const getTopGainersByExchange = async (
       code: 200,
       fromCache: false,
       data: {
-        exchange: exchangeSymbol.toUpperCase(),
+        exchange: String(exchangeSymbol).toUpperCase(),
         total: gainers.length,
         gainers,
       },
@@ -3158,7 +3114,7 @@ export const getTopLosersByExchange = async (
       code: 200,
       fromCache: false,
       data: {
-        exchange: exchangeSymbol.toUpperCase(),
+        exchange: String(exchangeSymbol).toUpperCase(),
         total: losers.length,
         losers,
       },
@@ -3270,7 +3226,7 @@ export const getPerformanceByIndustry = async (
     const industries = Array.from(industryMap.values()).map(industry => {
       industry.avg_percentage_change = industry.avg_percentage_change / industry.total_companies;
       
-      industry.companies.sort((a, b) => 
+      industry.companies.sort((a: any, b: any) => 
         (b.percentage_change || 0) - (a.percentage_change || 0)
       );
       
@@ -3282,7 +3238,7 @@ export const getPerformanceByIndustry = async (
     industries.sort((a, b) => b.avg_percentage_change - a.avg_percentage_change);
 
     const response = {
-      exchange: exchangeSymbol.toUpperCase(),
+      exchange: String(exchangeSymbol).toUpperCase(),
       last_updated: new Date(),
       summary: {
         total_industries: industries.length,
@@ -3398,7 +3354,7 @@ export const getMarketMoversByExchange = async (
       .slice(0, Number(losersLimit));
 
     const response = {
-      exchange: exchangeSymbol.toUpperCase(),
+      exchange: String(exchangeSymbol).toUpperCase(),
       last_updated: new Date(),
       summary: {
         total_stocks_tracked: stocksWithPerformance.length,

@@ -1,14 +1,16 @@
 {
   "name": "savanna-stack",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "ts-node-dev --respawn --transpile-only index.ts",
-    "dev": "ts-node-dev --transpile-only index.ts",
+    "start": "node dist/index.js",
+    "dev": "npm run start:dev",
     "build": "tsc",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "start:dev": "ts-node-dev --respawn --transpile-only index.ts",
+    "worker:usage": "node dist/workers/usage.worker.js"
   },
   "keywords": [],
   "author": "",

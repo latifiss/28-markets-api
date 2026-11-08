@@ -7,5 +7,5 @@ if (!stripeSecretKey) {
 }
 
 export const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2022-11-15',
+  apiVersion: '2026-03-25.dahlia',
 });

@@ -1,19 +1,25 @@
-import { Response, NextFunction } from 'express';
-import { AuthRequest } from './auth';
+import type { NextFunction, Response } from 'express';
+import type { AuthRequest } from './auth';
 import { authenticateApiKey } from './apiKey';
 import { authenticateToken } from './auth';
 
-export const unifiedAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const hasApiKey = req.headers['x-api-key'];
-  const hasToken = req.headers['authorization'];
-  
-  if (hasApiKey) {
+export const unifiedAuth = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  // The global mutation guard has already authenticated and admitted this request.
+  if (req.mutationGuardPassed && req.user) return next();
+
+  if (req.headers['x-api-key']) {
     return authenticateApiKey(req, res, next);
   }
-  
-  if (hasToken) {
+
+  if (req.headers.authorization) {
     return authenticateToken(req, res, next);
   }
-  
-  return res.status(401).json({ error: 'Authentication required. Provide JWT token or API key' });
+
+  return res.status(401).json({
+    error: 'Authentication required. Provide JWT token or API key',
+  });
 };

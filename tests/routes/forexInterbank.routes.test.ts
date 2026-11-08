@@ -1,4 +1,5 @@
 import request from 'supertest';
+jest.mock('../../middleware/protectMutations', () => ({ protectMutations: (_req: any, _res: any, next: any) => next() }));
 import { createApp } from '../../app';
 import ForexInterbank from '../../models/forexInterbank.model';
 

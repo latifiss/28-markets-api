@@ -1,44 +1,6 @@
 import type { Request, Response } from 'express';
 import Goldbod, { PriceHistory } from '../models/golbod.model';
-import { getRedisClient } from '../lib/redis';
-
-const setCache = async (key: string, data: any, expirationInSeconds = 86400): Promise<void> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.set === 'function') {
-      await client.set(key, JSON.stringify(data), { EX: expirationInSeconds });
-    }
-  } catch (error: any) {
-    console.error('Error setting cache:', error.message);
-  }
-};
-
-const getCache = async (key: string): Promise<any> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.get === 'function') {
-      const data = await client.get(key);
-      return data ? JSON.parse(data) : null;
-    }
-    return null;
-  } catch (error: any) {
-    console.error('Error getting cache:', error.message);
-    return null;
-  }
-};
-
-const deleteCacheByPattern = async (pattern: string): Promise<void> => {
-  try {
-    const client = await getRedisClient();
-    if (client && typeof client.scanIterator === 'function') {
-      for await (const key of client.scanIterator({ MATCH: pattern })) {
-        await client.del(key);
-      }
-    }
-  } catch (error: any) {
-    console.error('Error deleting cache by pattern:', error.message);
-  }
-};
+import { setCache, getCache, deleteCacheByPattern } from '../lib/cache';
 
 export const getAllGoldbod = async (req: Request, res: Response): Promise<void> => {
   try {

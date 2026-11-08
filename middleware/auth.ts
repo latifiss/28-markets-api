@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import type { PlanTier } from '../utils/tiers';
 
@@ -7,48 +7,69 @@ export interface AuthRequest extends Request {
   apiKey?: string;
   apiKeyId?: string;
   tier?: PlanTier;
+  mutationGuardPassed?: boolean;
 }
 
 export interface UserPayload {
   userId: string;
   email: string;
+  tier?: PlanTier;
+  role?: 'user' | 'admin';
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('JWT_SECRET must be configured with at least 32 characters');
+  }
+  return secret;
+};
 
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+export const authenticateToken = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  const authorization = req.headers.authorization;
+  const token = authorization?.startsWith('Bearer ')
+    ? authorization.slice(7)
+    : undefined;
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication token required' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid token' });
-    }
-    req.user = user as UserPayload;
-    next();
-  });
+  try {
+    const payload = jwt.verify(token, getJwtSecret()) as UserPayload;
+    req.user = payload;
+    req.tier = payload.tier;
+    return next();
+  } catch {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
 };
 
-export const optionalAuth = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+export const optionalAuth = (
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction,
+) => {
+  const authorization = req.headers.authorization;
+  const token = authorization?.startsWith('Bearer ')
+    ? authorization.slice(7)
+    : undefined;
 
-  if (!token) {
-    return next();
+  if (!token) return next();
+
+  try {
+    req.user = jwt.verify(token, getJwtSecret()) as UserPayload;
+    req.tier = req.user.tier;
+  } catch {
+    // Optional authentication deliberately continues as anonymous.
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (!err) {
-      req.user = user as UserPayload;
-    }
-    next();
-  });
+  return next();
 };
 
-export const generateToken = (payload: UserPayload): string => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
-};
+export const generateToken = (payload: UserPayload): string =>
+  jwt.sign(payload, getJwtSecret(), { expiresIn: '24h' });

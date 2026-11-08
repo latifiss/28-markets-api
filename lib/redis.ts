@@ -1,55 +1,78 @@
-import { createClient, RedisClientType } from 'redis';
+import { createClient } from 'redis';
+type RedisClient = ReturnType<typeof createClient>;
 
-const redisConfig = {
-  username: process.env.REDIS_USERNAME,
-  password: process.env.REDIS_PASSWORD,
-  socket: {
-    host: process.env.REDIS_HOST,
-    port: Number(process.env.REDIS_PORT),
-  },
-};
+let client: RedisClient | null = null;
+let connectionPromise: Promise<RedisClient | null> | null = null;
 
-let client: RedisClientType | null = null;
-let isConnecting = false;
-let connectionPromise: Promise<RedisClientType> | null = null;
+function createRedisClient() {
+  const url = process.env.REDIS_URL;
 
-export const getRedisClient = async (): Promise<RedisClientType | null> => {
-  if (client && client.isReady) {
-    return client;
+  if (url) {
+    return createClient({
+      url,
+      socket: {
+        connectTimeout: 10000,
+        reconnectStrategy: (retries) => Math.min(retries * 250, 5000),
+      },
+    });
   }
 
-  if (isConnecting && connectionPromise) {
-    return connectionPromise;
-  }
+  // Backward-compatible local development configuration.
+  const host = process.env.REDIS_HOST;
+  if (!host) return null;
 
-  isConnecting = true;
-  console.log('🔌 Connecting to Redis...');
+  return createClient({
+    username: process.env.REDIS_USERNAME || undefined,
+    password: process.env.REDIS_PASSWORD || undefined,
+    socket: {
+      host,
+      port: Number(process.env.REDIS_PORT || 6379),
+      connectTimeout: 10000,
+      reconnectStrategy: (retries) => Math.min(retries * 250, 5000),
+    },
+  });
+}
 
-  connectionPromise = new Promise(async (resolve, reject) => {
-    try {
-      client = createClient(redisConfig);
+export const getRedisClient = async (): Promise<RedisClient | null> => {
+  if (client?.isReady) return client;
+  if (connectionPromise) return connectionPromise;
 
-      client.on('error', (err: Error) => {
-        console.error('❌ Redis Client Error:', err);
-        isConnecting = false;
-        reject(err);
-      });
+  const redisClient = createRedisClient();
+  if (!redisClient) return null;
 
-      client.on('ready', () => {
-        console.log('✅ Redis connected successfully!');
-        isConnecting = false;
-        resolve(client!);
-      });
-
-      await client.connect();
-    } catch (error) {
-      console.error('❌ Failed to connect to Redis:', error);
-      isConnecting = false;
-      client = null;
-      connectionPromise = null;
-      reject(error);
-    }
+  client = redisClient;
+  redisClient.on('error', (error: Error) => {
+    console.error('Redis client error:', error.message);
   });
 
+  connectionPromise = (async () => {
+    try {
+      await redisClient.connect();
+      console.info('Redis connected');
+      return redisClient;
+    } catch (error) {
+      console.error('Redis connection failed:', error);
+      client = null;
+      try {
+        redisClient.destroy();
+      } catch {
+        // The connection may already be closed.
+      }
+      return null;
+    } finally {
+      connectionPromise = null;
+    }
+  })();
+
   return connectionPromise;
+};
+
+export const closeRedisClient = async (): Promise<void> => {
+  const activeClient = client;
+  client = null;
+  connectionPromise = null;
+
+  if (activeClient?.isOpen) {
+    await activeClient.quit();
+  }
 };

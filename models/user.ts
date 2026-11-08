@@ -8,6 +8,7 @@ export interface IUser extends Document {
   name: string;
   isActive: boolean;
   tier: PlanTier;
+  role: 'user' | 'admin';
   stripeCustomerId?: string;
   subscriptionStatus?: 'active' | 'past_due' | 'canceled' | 'incomplete';
   currentPeriodEnd?: Date;
@@ -35,6 +36,7 @@ const userSchema: Schema = new Schema(
       type: Boolean,
       default: true,
     },
+    role: { type: String, enum: ['user', 'admin'], default: 'user', index: true },
     tier: {
       type: String,
       enum: ['free', 'pro', 'business'],
