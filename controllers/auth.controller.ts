@@ -168,7 +168,8 @@ export const deleteApiKey = async (
   res: Response,
 ): Promise<void> => {
   try {
-    if (!mongoose.isValidObjectId(req.params.keyId)) {
+    const keyId = String(req.params.keyId || '');
+    if (!mongoose.isValidObjectId(keyId)) {
       res.status(404).json({
         error: 'API key not found',
         code: 'API_KEY_NOT_FOUND',
@@ -176,7 +177,7 @@ export const deleteApiKey = async (
       return;
     }
 
-    const deleted = await revokeApiKeyById(req.user!.userId, req.params.keyId);
+    const deleted = await revokeApiKeyById(req.user!.userId, keyId);
     if (!deleted) {
       res.status(404).json({
         error: 'API key not found',

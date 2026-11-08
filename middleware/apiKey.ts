@@ -38,7 +38,7 @@ export const revokeApiKeyById = async (
   const record = await ApiKey.findOneAndUpdate(
     { _id: keyId, userId, revoked: false },
     { $set: { revoked: true } },
-    { new: true },
+    { returnDocument: 'after' },
   ).select('+keyHash');
 
   if (!record) return false;

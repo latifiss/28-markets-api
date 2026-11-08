@@ -1,6 +1,6 @@
 const required = (name: string): string => {
   const value = process.env[name]?.trim();
-  if (!value) throw new Error(\`Missing required environment variable: \${name}\`);
+  if (!value) throw new Error('Missing required environment variable: ' + name);
   return value;
 };
 
@@ -9,7 +9,7 @@ const validatePositiveInteger = (name: string): void => {
   if (raw === undefined || raw.trim() === '') return;
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new Error(\`\${name} must be a positive integer\`);
+    throw new Error(name + ' must be a positive integer');
   }
 };
 
