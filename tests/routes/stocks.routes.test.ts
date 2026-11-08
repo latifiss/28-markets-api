@@ -12,6 +12,7 @@ jest.mock('../../lib/redis', () => ({
 
 import { createApp } from '../../app';
 import { generateToken } from '../../middleware/auth';
+import User from '../../models/user';
 import { PriceHistory } from '../../models/stocks.model';
 
 describe('Equities routes', () => {
@@ -25,7 +26,15 @@ describe('Equities routes', () => {
       updatedAt: new Date(),
     });
 
-    const token = generateToken({ userId: '64b000000000000000000012', email: 'admin@example.com', role: 'admin' });
+    await User.create({
+      _id: '64b000000000000000000012',
+      email: 'stocks-admin@example.com',
+      name: 'Test Administrator',
+      password: 'test-password-hash',
+      role: 'admin',
+      isActive: true,
+    });
+    const token = generateToken({ userId: '64b000000000000000000012', email: 'stocks-admin@example.com', role: 'admin' });
     const response = await request(createApp())
       .put(`/api/v1/equities/price-history/${doc.company_id}/latest`)
       .set('Authorization', `Bearer ${token}`)
