@@ -75,3 +75,8 @@ Defaults are configurable through `API_RATE_LIMIT_MAX`, `API_WRITE_RATE_LIMIT_MA
 ## Endpoint migration
 
 The new canonical route namespace is `/api/v1`. Old unversioned routes are not mounted by the new application router. Update consumers to the paths in `README.md` and `docs/api-v1.md` before deploying. Account usage remains analytics-only and does not gate access.
+
+
+## Legacy account-field cleanup
+
+The application schema no longer reads paid-plan or payment-provider fields. After taking a database backup, run `npm run migrate:remove-legacy-plan-fields` once to unset `tier`, `stripeCustomerId`, `subscriptionStatus` and `currentPeriodEnd` from user documents. The script does not delete historical subscription records; retain or archive those according to your data-retention requirements.
