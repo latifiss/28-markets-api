@@ -1,6 +1,6 @@
 # API endpoint contract
 
-The canonical prefix is `/api/v1`. Route methods are classified centrally:
+The canonical prefix is `/api/v1`. The root API information endpoint (`/`) is also authenticated. Route methods are classified centrally:
 
 - Every `/api/v1` route requires a valid API key or bearer JWT, regardless of HTTP method.
 - `POST /auth/register` and `POST /auth/login` are the only API route exceptions, because they bootstrap credentials. Operational health checks outside `/api/v1` remain public; CORS `OPTIONS` preflight requests are also public.
