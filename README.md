@@ -36,7 +36,7 @@ The API key is displayed once when created. Only a SHA-256 hash is stored. Never
 | Economic indicators | `/economic-indicators` | `GET /interest-rate`, `GET /inflation-rate/latest`, `GET /indicators/latest-all` |
 | Treasury bonds | `/treasury/bonds` | `GET /`, `GET /active`, `GET /highest-yielding`, `GET /:id` |
 | Equities | `/equities` | `GET /profiles/:company_id`, `GET /price-history/:company_id`, `GET /exchanges/:exchangeSymbol/market-movers`, `GET /companies/:company_id/overview` |
-| Market events | `/events` | `GET /`, `GET /latest`, `GET /upcoming`, `GET /search` |
+| Market events | `/events` | `GET /`, `GET /latest`, `GET /upcoming`, `GET /search`, `GET /:id`, `GET /codes/:code` |
 
 The route modules also expose history, statistics, dividends, earnings, financials, holders, bulk-ingestion and administrative operations. See `docs/api-v1.md` and the route files for the complete method/path inventory.
 

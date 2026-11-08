@@ -9,12 +9,21 @@ const adminUserIds = new Set(
     .filter(Boolean),
 );
 
+const readOnlyPostPaths = [
+  /^\/api\/v1\/forex\/pairs\/bulk\/(query|export)$/,
+  /^\/api\/v1\/treasury\/bonds\/[^/]+\/calculate$/,
+];
+
 export function protectMutations(
   req: AuthRequest,
   res: Response,
   next: NextFunction,
 ) {
-  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase())) {
+  const method = req.method.toUpperCase();
+  if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return next();
+
+  const path = req.originalUrl.split('?')[0];
+  if (method === 'POST' && readOnlyPostPaths.some((pattern) => pattern.test(path))) {
     return next();
   }
 

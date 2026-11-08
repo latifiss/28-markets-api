@@ -50,21 +50,21 @@ async function consumeBucket(
   capacity: number,
 ): Promise<{ allowed: boolean; remaining: number; retryAfter: number }> {
   const now = Date.now();
-  const ttl = WINDOW_MS * 2;
   const result = (await redis.eval(TOKEN_BUCKET_SCRIPT, {
     keys: [key],
     arguments: [
       String(capacity),
       String(capacity / WINDOW_MS),
       String(now),
-      String(ttl),
+      String(WINDOW_MS * 2),
     ],
   })) as number[];
 
-  const allowed = Number(result?.[0]) === 1;
-  const remaining = Math.max(0, Number(result?.[1] || 0));
-  const retryAfter = Math.max(1, Math.ceil(Number(result?.[2] || 1) / 1000));
-  return { allowed, remaining, retryAfter };
+  return {
+    allowed: Number(result?.[0]) === 1,
+    remaining: Math.max(0, Number(result?.[1] || 0)),
+    retryAfter: Math.max(1, Math.ceil(Number(result?.[2] || 1) / 1000)),
+  };
 }
 
 function unavailable(res: Response) {
@@ -74,7 +74,6 @@ function unavailable(res: Response) {
   });
 }
 
-/** Coarse IP guard runs before API-key authentication to protect invalid-key attempts. */
 export async function apiIpRateLimit(
   req: AuthRequest,
   res: Response,
@@ -86,11 +85,7 @@ export async function apiIpRateLimit(
 
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const limit = positiveInt('API_IP_RATE_LIMIT_MAX', 1200);
-    const result = await consumeBucket(
-      redis,
-      `28m:api-rl:v2:ip:${digest(ip)}`,
-      limit,
-    );
+    const result = await consumeBucket(redis, `28m:api-rl:v2:ip:${digest(ip)}`, limit);
 
     res.setHeader('RateLimit-Policy', `${limit};w=60`);
     res.setHeader('RateLimit-Limit', String(limit));
@@ -107,7 +102,6 @@ export async function apiIpRateLimit(
         retryAfter: result.retryAfter,
       });
     }
-
     return next();
   } catch (error) {
     console.error('IP rate limiter failed:', error);
@@ -115,7 +109,15 @@ export async function apiIpRateLimit(
   }
 }
 
-/** Identity guard runs after optional JWT/API-key authentication. */
+const isReadOnlyPost = (req: AuthRequest): boolean => {
+  if (req.method.toUpperCase() !== 'POST') return false;
+  const path = req.originalUrl.split('?')[0];
+  return [
+    /^\/api\/v1\/forex\/pairs\/bulk\/(query|export)$/,
+    /^\/api\/v1\/treasury\/bonds\/[^/]+\/calculate$/,
+  ].some((pattern) => pattern.test(path));
+};
+
 export async function apiRateLimit(
   req: AuthRequest,
   res: Response,
@@ -131,7 +133,9 @@ export async function apiRateLimit(
       : req.user?.userId
         ? `user:${req.user.userId}`
         : `anonymous:${ip}`;
-    const writeRequest = !['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase());
+    const writeRequest =
+      !['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase()) &&
+      !isReadOnlyPost(req);
     const limit = writeRequest
       ? positiveInt('API_WRITE_RATE_LIMIT_MAX', 60)
       : positiveInt('API_RATE_LIMIT_MAX', 600);

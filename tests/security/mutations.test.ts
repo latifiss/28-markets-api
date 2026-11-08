@@ -32,6 +32,14 @@ describe('market data mutation security', () => {
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
   });
+  it.each([
+    '/api/v1/forex/pairs/bulk/query',
+    '/api/v1/forex/pairs/bulk/export',
+  ])('allows read-only bulk operation %s without administrator credentials', async (path) => {
+    const response = await request(createApp()).post(path).send({});
+    expect(response.status).toBe(200);
+  });
+
   it('rejects authenticated non-admin users from market-data writes', async () => {
     const token = generateToken({
       userId: '64b000000000000000000001',
