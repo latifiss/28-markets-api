@@ -35,9 +35,53 @@ describe('market data mutation security', () => {
   it.each([
     '/api/v1/forex/pairs/bulk/query',
     '/api/v1/forex/pairs/bulk/export',
-  ])('allows read-only bulk operation %s without administrator credentials', async (path) => {
-    const response = await request(createApp()).post(path).send({});
-    expect(response.status).toBe(200);
+  ])('requires authentication for read-only POST operation %s but not admin privileges', async (path) => {
+    const anonymous = await request(createApp()).post(path).send({});
+    expect(anonymous.status).toBe(401);
+
+    const token = generateToken({
+      userId: '64b000000000000000000002',
+      email: 'reader@example.com',
+      role: 'user',
+    });
+    const authenticated = await request(createApp())
+      .post(path)
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+    expect(authenticated.status).not.toBe(401);
+    expect(authenticated.status).not.toBe(403);
+  });
+
+  it.each([
+    '/api/v1/',
+    '/api/v1/forex/pairs',
+    '/api/v1/crypto',
+    '/api/v1/account/usage',
+  ])('rejects anonymous reads on %s', async (path) => {
+    const response = await request(createApp()).get(path);
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('keeps registration and login available for credential bootstrap', async () => {
+    const registration = await request(createApp())
+      .post('/api/v1/auth/register')
+      .send({});
+    expect(registration.status).toBe(400);
+    expect(registration.body.code).toBe('INVALID_REGISTRATION_INPUT');
+
+    const login = await request(createApp())
+      .post('/api/v1/auth/login')
+      .send({});
+    expect(login.status).toBe(400);
+    expect(login.body.code).toBe('INVALID_LOGIN_INPUT');
+  });
+
+  it('requires credentials for DELETE and other non-bootstrap methods', async () => {
+    const response = await request(createApp())
+      .delete('/api/v1/forex/pairs/USD-GHS');
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
   it('rejects authenticated non-admin users from market-data writes', async () => {
